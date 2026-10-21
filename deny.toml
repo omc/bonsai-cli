@@ -1,0 +1,33 @@
+[advisories]
+# Unmaintained, with no upgrade open to us (cargo deny check, 2026-10-20). None is a
+# vulnerability. Review when the dependency that pulls them in moves.
+ignore = [
+  # unsafe-libyaml, through serde_yaml, in bonsai-contract only (a dev-dependency,
+  # not in the shipped binary).
+  { id = "RUSTSEC-2024-0449", reason = "serde_yaml in bonsai-contract (tests only); no maintained upgrade" },
+  # zbus_names, zvariant and zvariant_derive were merged into zbus 6 (its `names`
+  # and `wire` modules); the advisories name zbus 6 as the fix. Two crates hold
+  # zbus 5 (5.19.0 in Cargo.lock) in place: zbus-secret-service-keyring-store
+  # 1.0.1, the Linux keyring store, and secret-service 5.2.0, which it builds on.
+  # Revisit, and drop these three ignores, once releases of both move to zbus 6.
+  { id = "RUSTSEC-2026-0370", reason = "zvariant via zbus 5 in zbus-secret-service-keyring-store and secret-service; fixed by zbus 6, which neither uses yet" },
+  { id = "RUSTSEC-2026-0371", reason = "zbus_names via zbus 5 in zbus-secret-service-keyring-store and secret-service; fixed by zbus 6, which neither uses yet" },
+  { id = "RUSTSEC-2026-0372", reason = "zvariant_derive via zbus 5 in zbus-secret-service-keyring-store and secret-service; fixed by zbus 6, which neither uses yet" },
+]
+
+[licenses]
+allow = [
+  "MIT",
+  "MIT-0",
+  "Apache-2.0",
+  "Apache-2.0 WITH LLVM-exception",
+  "BSD-2-Clause",
+  "BSD-3-Clause",
+  "ISC",
+  "Unicode-3.0",
+  "Zlib",
+  "CDLA-Permissive-2.0",
+]
+
+[bans]
+multiple-versions = "warn"

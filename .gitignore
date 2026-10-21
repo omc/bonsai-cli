@@ -1,0 +1,6 @@
+target/
+*.sqlite
+*.sqlite-*
+docs/plans/
+.superpowers/
+result
