@@ -97,6 +97,7 @@ jobs:
 
   # `nix run github:omc/bonsai-cli` builds flake.nix; check it still builds.
   nix:
+    needs: [fmt, clippy, deny]
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v6
