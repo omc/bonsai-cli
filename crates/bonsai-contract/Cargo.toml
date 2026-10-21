@@ -1,0 +1,13 @@
+[package]
+name = "bonsai-contract"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+license.workspace = true
+
+[dependencies]
+serde_json.workspace = true
+serde_yaml.workspace = true
+jsonschema.workspace = true
+thiserror.workspace = true

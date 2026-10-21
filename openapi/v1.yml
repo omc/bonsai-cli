@@ -1,0 +1,1254 @@
+openapi: 3.0.3
+info:
+  title: Bonsai API
+  version: "1.0.0-draft"
+  contact: { name: Bonsai support, url: "https://bonsai.io/support" }
+  description: |
+    Manage an account's Bonsai clusters from code: create, rename, delete and
+    change their plans; read their Actions, credentials, usage, metrics and
+    top queries; and list the plans, regions, spaces and releases to create
+    them with. Authenticate with an API token as `Authorization: Bearer
+    <token>`; the token's scopes decide which operations it may call. Tokens
+    belong to the account: one keeps working when the person who created it
+    leaves, until an Admin revokes it in the dashboard. Errors are
+    `application/problem+json`: branch on `code`.
+
+    Open sets (states, Action types, error codes) are strings with
+    `x-extensible-enum`: new values are additive, and clients must accept a
+    value they don't know.
+
+servers:
+  - url: https://api.bonsai.io/v1
+security:
+  - bearer: []
+tags:
+  - { name: meta, description: The API itself. }
+  - { name: account, description: The account the token belongs to. }
+  - { name: clusters, description: "Clusters and their usage, metrics and queries." }
+  - name: actions
+    description: |
+      Slow work on a cluster runs as an Action: start it, get `202` with the
+      Action and a `Location` header, then poll `GET /actions/{action_id}` until
+      its `state` is `success` or `error`, waiting the seconds its `Retry-After`
+      header gives between polls. Three operations start one, and each
+      lists what it starts in `x-action-types`:
+
+      | To | Call | Starts |
+      |---|---|---|
+      | Create a cluster | `POST /clusters` | `cluster.provision` |
+      | Delete a cluster | `DELETE /clusters/{cluster_id}?name=` | `cluster.deprovision` |
+      | Change a cluster's plan | `POST /clusters/{cluster_id}/plan_changes` | `cluster.change_plan` |
+
+      All three take `Idempotency-Key`: a retry with the same key gets the same
+      Action back. Some Actions are started by Bonsai rather than by you
+      (`cluster.read_only`, `cluster.disable`, `cluster.enable`); they show up
+      in the same lists.
+  - { name: credentials, description: Connection credentials for a cluster. }
+  - { name: catalogue, description: "Plans, regions, spaces and releases." }
+
+paths:
+  /:
+    get:
+      operationId: getApiRoot
+      tags: [meta]
+      summary: Show the API's version and where its docs are
+      description: Needs no token, so it also serves as a health check. Rate-limited by IP address.
+      security: []
+      responses:
+        "200":
+          description: The API's name, version and links.
+          headers:
+            RateLimit: { $ref: "#/components/headers/RateLimit" }
+            RateLimit-Policy: { $ref: "#/components/headers/RateLimitPolicy" }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ApiRoot" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+  /account:
+    get:
+      operationId: getAccount
+      tags: [account]
+      summary: Show the token's account
+      description: What the dashboard's account settings show every member. No billing or payment details.
+      x-operation: read_account
+      responses:
+        "200":
+          description: The account.
+          headers:
+            RateLimit: { $ref: "#/components/headers/RateLimit" }
+            RateLimit-Policy: { $ref: "#/components/headers/RateLimitPolicy" }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Account" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+  /clusters:
+    get:
+      operationId: listClusters
+      tags: [clusters]
+      summary: List the account's clusters
+      description: Newest first. Terminated clusters are not listed.
+      x-operation: read_clusters
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Cursor"
+        - { name: name, in: query, description: Case-insensitive substring of the name., schema: { type: string, maxLength: 512 } }
+        - { name: region, in: query, description: Region ID., schema: { type: string } }
+        - { name: space, in: query, description: Space ID (private placement only)., schema: { type: string } }
+        - { name: single_tenant, in: query, schema: { type: boolean } }
+        - { name: state, in: query, description: One of the cluster states., schema: { type: string } }
+      responses:
+        "200":
+          description: A page of clusters.
+          headers:
+            RateLimit: { $ref: "#/components/headers/RateLimit" }
+            RateLimit-Policy: { $ref: "#/components/headers/RateLimitPolicy" }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ClusterList" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+    post:
+      operationId: createCluster
+      tags: [clusters]
+      summary: Create a cluster
+      description: |-
+        Starts a `cluster.provision` Action. Poll it; its `result` names the cluster and its first credential.
+
+        Unless the account is billed by invoice, a paid plan needs a payment method
+        on file. Without one this is refused at once with `422
+        payment_method_required`, before any Action starts, so the same
+        `Idempotency-Key` works once a card is added. The problem's `action_url`
+        is a Stripe Checkout page where a person adds one, no Bonsai login needed.
+        A card added there becomes the account's default.
+
+        Billing starts before the cluster is built, during this request. If
+        Stripe refuses the charge, this is `422 payment_failed`, with the same
+        kind of `action_url`; nothing is built, and the same `Idempotency-Key`
+        works once a card is added. If the build fails after the 202, billing
+        stops and the Action fails with `action_failed`.
+      x-operation: create_cluster
+      x-action-types: [cluster.provision]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ClusterCreate" }
+      responses:
+        "202":
+          description: Provisioning started.
+          headers:
+            RateLimit: { $ref: "#/components/headers/RateLimit" }
+            RateLimit-Policy: { $ref: "#/components/headers/RateLimitPolicy" }
+            Location:
+              description: The Action's URL.
+              schema: { type: string }
+            Idempotent-Replayed: { $ref: "#/components/headers/IdempotentReplayed" }
+            Retry-After: { $ref: "#/components/headers/ActionRetryAfter" }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Action" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422": { $ref: "#/components/responses/Unprocessable" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+  /clusters/{cluster_id}:
+    parameters:
+      - $ref: "#/components/parameters/ClusterId"
+    get:
+      operationId: getCluster
+      tags: [clusters]
+      summary: Show a cluster
+      description: Terminated clusters are still shown, with state `deprovisioned`.
+      x-operation: read_clusters
+      responses:
+        "200":
+          description: The cluster.
+          headers:
+            RateLimit: { $ref: "#/components/headers/RateLimit" }
+            RateLimit-Policy: { $ref: "#/components/headers/RateLimitPolicy" }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Cluster" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+    patch:
+      operationId: updateCluster
+      tags: [clusters]
+      summary: Rename a cluster
+      description: Synchronous. To change the plan, start a `cluster.change_plan` Action with `POST /clusters/{cluster_id}/plan_changes`.
+      x-operation: update_cluster
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ClusterUpdate" }
+      responses:
+        "200":
+          description: The renamed cluster.
+          headers:
+            RateLimit: { $ref: "#/components/headers/RateLimit" }
+            RateLimit-Policy: { $ref: "#/components/headers/RateLimitPolicy" }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Cluster" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/Unprocessable" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+    delete:
+      operationId: deleteCluster
+      tags: [clusters]
+      summary: Deprovision a cluster
+      description: |
+        Starts a `cluster.deprovision` Action. `name` must equal the cluster's
+        current name exactly; legacy clients already send it this way. Send an
+        `Idempotency-Key` to retry safely: without one, a retry after the
+        cluster is terminated gets `422 cluster_terminated` instead of the Action.
+      x-operation: destroy_cluster
+      x-action-types: [cluster.deprovision]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - name: name
+          in: query
+          required: true
+          description: The cluster's current name, as confirmation.
+          schema: { type: string, minLength: 1, maxLength: 512 }
+      responses:
+        "202":
+          description: Deprovisioning started.
+          headers:
+            RateLimit: { $ref: "#/components/headers/RateLimit" }
+            RateLimit-Policy: { $ref: "#/components/headers/RateLimitPolicy" }
+            Location:
+              description: The Action's URL.
+              schema: { type: string }
+            Idempotent-Replayed: { $ref: "#/components/headers/IdempotentReplayed" }
+            Retry-After: { $ref: "#/components/headers/ActionRetryAfter" }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Action" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422": { $ref: "#/components/responses/Unprocessable" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+  /clusters/{cluster_id}/plan_changes:
+    parameters:
+      - $ref: "#/components/parameters/ClusterId"
+    post:
+      operationId: changeClusterPlan
+      tags: [clusters]
+      summary: Change a cluster's plan
+      description: |-
+        Starts a `cluster.change_plan` Action. Changes on shared servers take seconds; on dedicated ones, minutes.
+
+        Unless the account is billed by invoice, moving to a paid plan needs a payment method
+        on file. Without one this is refused at once with `422
+        payment_method_required`, before any Action starts, so the same
+        `Idempotency-Key` works once a card is added. The problem's `action_url`
+        is a Stripe Checkout page where a person adds one, no Bonsai login needed.
+        A card added there becomes the account's default.
+      x-operation: update_cluster
+      x-action-types: [cluster.change_plan]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PlanChange" }
+      responses:
+        "202":
+          description: Plan change started.
+          headers:
+            RateLimit: { $ref: "#/components/headers/RateLimit" }
+            RateLimit-Policy: { $ref: "#/components/headers/RateLimitPolicy" }
+            Location:
+              description: The Action's URL.
+              schema: { type: string }
+            Idempotent-Replayed: { $ref: "#/components/headers/IdempotentReplayed" }
+            Retry-After: { $ref: "#/components/headers/ActionRetryAfter" }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Action" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422": { $ref: "#/components/responses/Unprocessable" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+  /clusters/{cluster_id}/actions:
+    parameters:
+      - $ref: "#/components/parameters/ClusterId"
+    get:
+      operationId: listClusterActions
+      tags: [actions]
+      summary: List a cluster's Actions
+      description: Newest first. Only customer-visible Action types are listed.
+      x-operation: read_clusters
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Cursor"
+      responses:
+        "200":
+          description: A page of Actions.
+          headers:
+            RateLimit: { $ref: "#/components/headers/RateLimit" }
+            RateLimit-Policy: { $ref: "#/components/headers/RateLimitPolicy" }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ActionList" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+  /actions/{action_id}:
+    parameters:
+      - name: action_id
+        in: path
+        required: true
+        description: Opaque Action ID.
+        schema: { type: string, pattern: "^act_[0-9a-z]{16}$" }
+    get:
+      operationId: getAction
+      tags: [actions]
+      summary: Show an Action
+      description: Includes the customer-facing steps. While the Action runs, `Retry-After` says how long to wait before polling again.
+      x-operation: read_clusters
+      responses:
+        "200":
+          description: The Action.
+          headers:
+            RateLimit: { $ref: "#/components/headers/RateLimit" }
+            RateLimit-Policy: { $ref: "#/components/headers/RateLimitPolicy" }
+            Retry-After: { $ref: "#/components/headers/ActionRetryAfter" }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Action" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+  /clusters/{cluster_id}/usage:
+    parameters:
+      - $ref: "#/components/parameters/ClusterId"
+    get:
+      operationId: getClusterUsage
+      tags: [clusters]
+      summary: Storage, documents and shards over time
+      description: |
+        One sample per index-stats poll (about every 10 minutes), summed over
+        the cluster's indices, oldest first. At most 90 days. A cluster that
+        was never polled has an empty `samples`, not a zero sample. The
+        cluster's current totals are `Cluster.stats`, not part of this body.
+      x-operation: read_clusters
+      parameters:
+        - $ref: "#/components/parameters/From"
+        - $ref: "#/components/parameters/To"
+      responses:
+        "200":
+          description: Usage samples.
+          headers:
+            RateLimit: { $ref: "#/components/headers/RateLimit" }
+            RateLimit-Policy: { $ref: "#/components/headers/RateLimitPolicy" }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Usage" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+        "503": { $ref: "#/components/responses/Unavailable" }
+
+  /clusters/{cluster_id}/metrics:
+    parameters:
+      - $ref: "#/components/parameters/ClusterId"
+    get:
+      operationId: getClusterMetrics
+      tags: [clusters]
+      summary: Request metrics over time
+      description: |
+        Bucketed request metrics. Without `resolution`, the server picks the
+        smallest of 1m, 30m, 1h, 6h, 12h, 1d that gives fewer than 100 buckets
+        (30 days gives 12h). At most 30 days and 1,000 buckets, and `from` no
+        earlier than the start of the UTC day 30 days ago. A range out of
+        bounds is a 400 naming `from`, and a resolution not offered or giving
+        too many buckets is a 400 naming `resolution`.
+      x-operation: read_clusters
+      parameters:
+        - $ref: "#/components/parameters/From"
+        - $ref: "#/components/parameters/To"
+        - name: resolution
+          in: query
+          description: Bucket size, one of 1m, 30m, 1h, 6h, 12h, 1d.
+          schema: { type: string, pattern: "^(1m|30m|1h|6h|12h|1d)$" }
+      responses:
+        "200":
+          description: Metric buckets.
+          headers:
+            RateLimit: { $ref: "#/components/headers/RateLimit" }
+            RateLimit-Policy: { $ref: "#/components/headers/RateLimitPolicy" }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Metrics" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+        "503": { $ref: "#/components/responses/Unavailable" }
+
+  /clusters/{cluster_id}/queries:
+    parameters:
+      - $ref: "#/components/parameters/ClusterId"
+    get:
+      operationId: getClusterTopQueries
+      tags: [clusters]
+      summary: The most frequent search queries
+      description: |
+        The top 100 normalized search strings in a window, with volume and
+        averages. These are the customer's end users' search terms, so the
+        token needs `query_logs:read`.
+      x-operation: read_query_logs
+      parameters:
+        - name: window
+          in: query
+          description: One of 1h, 1d, 7d, 14d, 30d. Defaults to 7d.
+          schema: { type: string, pattern: "^(1h|1d|7d|14d|30d)$", default: 7d }
+      responses:
+        "200":
+          description: Top queries.
+          headers:
+            RateLimit: { $ref: "#/components/headers/RateLimit" }
+            RateLimit-Policy: { $ref: "#/components/headers/RateLimitPolicy" }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TopQueries" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+        "503": { $ref: "#/components/responses/Unavailable" }
+
+  /clusters/{cluster_id}/credentials:
+    parameters:
+      - $ref: "#/components/parameters/ClusterId"
+    get:
+      operationId: listClusterCredentials
+      tags: [credentials]
+      summary: List a cluster's active credentials
+      description: Newest first. No secrets in the list. A terminated cluster has no active credentials.
+      x-operation: read_cluster_credentials
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Cursor"
+      responses:
+        "200":
+          description: A page of credentials.
+          headers:
+            RateLimit: { $ref: "#/components/headers/RateLimit" }
+            RateLimit-Policy: { $ref: "#/components/headers/RateLimitPolicy" }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CredentialList" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+    post:
+      operationId: createClusterCredential
+      tags: [credentials]
+      summary: Create a credential
+      description: |
+        Synchronous: the cluster's routes are updated before this answers, so
+        an `rw` or `ro` credential works as soon as it is returned. An `rwm` or
+        `acl` credential's permissions are then sent to the cluster in the
+        background, and apply once that finishes. The response is the only
+        one besides `getClusterCredential` that carries the password. The
+        cluster must be ready; a Hobby cluster may have one active credential.
+        A replay with the same `Idempotency-Key` returns the credential again
+        with `Idempotent-Replayed: true`, or `409 idempotency_replay_unavailable`
+        once it is revoked or can't be identified.
+      x-operation: manage_cluster_credentials
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CredentialCreate" }
+      responses:
+        "201":
+          description: The new credential and its secret.
+          headers:
+            RateLimit: { $ref: "#/components/headers/RateLimit" }
+            RateLimit-Policy: { $ref: "#/components/headers/RateLimitPolicy" }
+            Location:
+              description: The credential's URL.
+              schema: { type: string }
+            Idempotent-Replayed: { $ref: "#/components/headers/IdempotentReplayed" }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CredentialWithSecret" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422": { $ref: "#/components/responses/Unprocessable" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+  /clusters/{cluster_id}/credentials/{credential_id}:
+    parameters:
+      - $ref: "#/components/parameters/ClusterId"
+      - name: credential_id
+        in: path
+        required: true
+        description: The credential's ID, which is its slug. It never changes.
+        schema: { type: string, pattern: "^[A-Za-z0-9-]+$" }
+    get:
+      operationId: getClusterCredential
+      tags: [credentials]
+      summary: Show a credential, with its secret
+      description: The only place a credential's password appears.
+      x-operation: read_cluster_credentials
+      responses:
+        "200":
+          description: The credential and its secret.
+          headers:
+            RateLimit: { $ref: "#/components/headers/RateLimit" }
+            RateLimit-Policy: { $ref: "#/components/headers/RateLimitPolicy" }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CredentialWithSecret" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+    delete:
+      operationId: revokeClusterCredential
+      tags: [credentials]
+      summary: Revoke a credential
+      description: |
+        Synchronous: the credential stops working on the cluster's routes
+        before this answers. An `rwm` or `acl` credential is then removed from
+        the cluster's permissions in the background. A revoked credential is
+        gone from this API, so revoking it again is a 404. The last active
+        `rw` credential can't be revoked (`422`).
+      x-operation: manage_cluster_credentials
+      responses:
+        "204":
+          description: Revoked.
+          headers:
+            RateLimit: { $ref: "#/components/headers/RateLimit" }
+            RateLimit-Policy: { $ref: "#/components/headers/RateLimitPolicy" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/Unprocessable" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+  /plans:
+    get:
+      operationId: listPlans
+      tags: [catalogue]
+      summary: List the plans this account can choose
+      description: Plans differ by account; this lists only the ones this account may use.
+      x-operation: read_plans
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Cursor"
+      responses:
+        "200":
+          description: A page of plans.
+          headers:
+            RateLimit: { $ref: "#/components/headers/RateLimit" }
+            RateLimit-Policy: { $ref: "#/components/headers/RateLimitPolicy" }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PlanList" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+  /plans/{plan_id}:
+    parameters:
+      - { name: plan_id, in: path, required: true, schema: { type: string } }
+    get:
+      operationId: getPlan
+      tags: [catalogue]
+      summary: Show a plan
+      description: 404 if the plan isn't available to this account.
+      x-operation: read_plans
+      responses:
+        "200":
+          description: The plan.
+          headers:
+            RateLimit: { $ref: "#/components/headers/RateLimit" }
+            RateLimit-Policy: { $ref: "#/components/headers/RateLimitPolicy" }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Plan" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+  /regions:
+    get:
+      operationId: listRegions
+      tags: [catalogue]
+      summary: List the regions clusters can be created in
+      description: Only regions accepting new clusters.
+      x-operation: read_spaces
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Cursor"
+      responses:
+        "200":
+          description: A page of regions.
+          headers:
+            RateLimit: { $ref: "#/components/headers/RateLimit" }
+            RateLimit-Policy: { $ref: "#/components/headers/RateLimitPolicy" }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RegionList" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+  /spaces:
+    get:
+      operationId: listSpaces
+      tags: [catalogue]
+      summary: List the account's private spaces
+      description: Empty for accounts without private placement. Shared spaces are not listed; pick a region instead.
+      x-operation: read_spaces
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Cursor"
+      responses:
+        "200":
+          description: A page of spaces.
+          headers:
+            RateLimit: { $ref: "#/components/headers/RateLimit" }
+            RateLimit-Policy: { $ref: "#/components/headers/RateLimitPolicy" }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SpaceList" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+  /releases:
+    get:
+      operationId: listReleases
+      tags: [catalogue]
+      summary: List the releases this account can choose
+      description: Sorted by engine, then version.
+      x-operation: read_releases
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Cursor"
+      responses:
+        "200":
+          description: A page of releases.
+          headers:
+            RateLimit: { $ref: "#/components/headers/RateLimit" }
+            RateLimit-Policy: { $ref: "#/components/headers/RateLimitPolicy" }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ReleaseList" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+components:
+  securitySchemes:
+    bearer:
+      type: http
+      scheme: bearer
+      description: An API token, `bonsai_<key>_<secret>`.
+
+  headers:
+    RateLimit:
+      description: 'draft-ietf-httpapi-ratelimit-headers-11, e.g. `"token";r=42;t=18`.'
+      schema: { type: string }
+    RateLimitPolicy:
+      description: 'draft-ietf-httpapi-ratelimit-headers-11, e.g. `"token";q=60;w=60`.'
+      schema: { type: string }
+    RetryAfter:
+      description: Seconds to wait.
+      schema: { type: integer, minimum: 1 }
+    ActionRetryAfter:
+      description: Set while the Action is `new` or `running`. Seconds to wait before polling it again.
+      required: false
+      schema: { type: integer, minimum: 1 }
+    IdempotentReplayed:
+      description: "`true` when this is the replay of an earlier request with the same `Idempotency-Key`, rebuilt from what it made as that is now; absent otherwise."
+      required: false
+      schema: { type: string }
+
+  parameters:
+    ClusterId:
+      name: cluster_id
+      in: path
+      required: true
+      description: The cluster's ID, which is its slug. It never changes.
+      schema: { type: string, pattern: "^[a-z0-9-]+$", maxLength: 64 }
+    Limit:
+      name: limit
+      in: query
+      description: Page size. Defaults to 25.
+      schema: { type: integer, minimum: 1, maximum: 100, default: 25 }
+    Cursor:
+      name: cursor
+      in: query
+      description: The `next_cursor` of the previous page. Opaque.
+      schema: { type: string }
+    From:
+      name: from
+      in: query
+      description: Start of the range, RFC 3339. Defaults to one hour before `to`.
+      schema: { type: string, format: date-time }
+    To:
+      name: to
+      in: query
+      description: End of the range, RFC 3339. Defaults to now.
+      schema: { type: string, format: date-time }
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: false
+      description: 1–255 printable ASCII characters, kept 24 hours. See the spec's appendix C.
+      schema: { type: string, minLength: 1, maxLength: 255, pattern: "^[\\x20-\\x7E]+$" }
+
+  responses:
+    BadRequest:
+      description: The request is malformed (`invalid_json`, `body_required`, `invalid_parameter`, `name_confirmation_required`).
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
+    Unauthorized:
+      description: Missing or invalid token (`unauthorized`).
+      headers:
+        WWW-Authenticate: { schema: { type: string } }
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
+    Forbidden:
+      description: The token lacks a scope, or the account doesn't have the feature (`missing_scope`, `feature_not_enabled`).
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
+    NotFound:
+      description: No such resource in this account (`not_found`).
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
+    Conflict:
+      description: The Idempotency-Key is in flight or can't be replayed, or an Action of the same kind is already running (`idempotency_key_in_use`, `idempotency_replay_unavailable`, `action_in_progress`).
+      headers:
+        Retry-After: { $ref: "#/components/headers/RetryAfter" }
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
+    Unprocessable:
+      description: The request is well-formed but refused (`validation_failed`, `name_mismatch`, `payment_method_required` and `payment_failed`, which carry an `action_url`, `cluster_terminated`, `plan_change_refused`, `idempotency_key_reused`).
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
+    RateLimited:
+      description: Too many requests (`rate_limited`, `too_many_failed_authentications`).
+      headers:
+        Retry-After: { $ref: "#/components/headers/RetryAfter" }
+        RateLimit: { $ref: "#/components/headers/RateLimit" }
+        RateLimit-Policy: { $ref: "#/components/headers/RateLimitPolicy" }
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
+    Unavailable:
+      description: The metrics or query-log store didn't answer (`metrics_unavailable`). Never an empty series or list.
+      headers:
+        Retry-After: { $ref: "#/components/headers/RetryAfter" }
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
+
+  schemas:
+    ApiRoot:
+      type: object
+      required: [name, version, docs_url, openapi_url]
+      properties:
+        name: { type: string, description: "`Bonsai API`." }
+        version: { type: string, description: "This contract's `info.version`." }
+        docs_url: { type: string, format: uri, description: The API reference. }
+        openapi_url: { type: string, format: uri, description: This contract as JSON. }
+
+    Account:
+      type: object
+      required: [id, name, contact_email_override, created_at]
+      properties:
+        id: { type: string, description: The account's slug. Never changes. }
+        name: { type: string }
+        contact_email_override:
+          type: string
+          nullable: true
+          description: When set, the only address that gets cluster notifications and billing email. null to use the default.
+        created_at: { type: string, format: date-time }
+
+    Problem:
+      type: object
+      description: RFC 9457 problem details, extended with `code` and `details`.
+      required: [type, title, status, code, detail, details]
+      properties:
+        type: { type: string, description: "A URL under https://bonsai.io/docs/api/errors/." }
+        title: { type: string }
+        status: { type: integer }
+        code:
+          type: string
+          description: Stable, snake_case. Branch on this, not on `title` or `detail`.
+          x-extensible-enum:
+            - unauthorized
+            - missing_scope
+            - feature_not_enabled
+            - rate_limited
+            - too_many_failed_authentications
+            - invalid_json
+            - body_required
+            - invalid_parameter
+            - name_confirmation_required
+            - name_mismatch
+            - not_found
+            - validation_failed
+            - payment_method_required
+            - payment_failed
+            - cluster_terminated
+            - plan_change_refused
+            - action_in_progress
+            - idempotency_key_reused
+            - idempotency_key_in_use
+            - idempotency_replay_unavailable
+            - metrics_unavailable
+            - internal_error
+        detail: { type: string }
+        instance: { type: string, nullable: true }
+        action_url:
+          type: string
+          format: uri
+          nullable: true
+          description: Where a person can fix the problem, when only a person can; absent otherwise. On `payment_method_required` and `payment_failed`, a Stripe Checkout page for adding a card, valid for at least an hour; repeat the request for a current one. If Stripe can't be reached, the dashboard page where an account Admin or Billing user adds one instead.
+        details:
+          type: array
+          items: { $ref: "#/components/schemas/ProblemDetail" }
+    ProblemDetail:
+      type: object
+      required: [field, message]
+      properties:
+        field: { type: string, nullable: true, description: "A JSON pointer into the body (`/plan`), or a query parameter's name (`limit`). null when no single field is at fault." }
+        message: { type: string }
+        scope: { type: string, description: "Set on `missing_scope`." }
+
+    PageInfo:
+      type: object
+      required: [next_cursor]
+      properties:
+        next_cursor: { type: string, nullable: true, description: null on the last page. }
+
+    Ref:
+      type: object
+      description: A pointer to another resource, embedded instead of `?expand=`.
+      required: [id, name]
+      properties:
+        id: { type: string }
+        name: { type: string }
+
+    ClusterState:
+      type: string
+      x-extensible-enum: [draft, provisioning, ready, failed, read_only, disabled, deprovisioning, deprovisioned]
+      description: |
+        `draft`: created in the dashboard and never provisioned.
+        `read_only` and `disabled` win over `ready`.
+
+    Cluster:
+      type: object
+      required: [id, name, state, plan, region, space, release, single_tenant, host, port, stats, latest_action, created_at, terminated_at]
+      properties:
+        id: { type: string, description: "The slug. Never changes, never reused." }
+        name: { type: string, description: A label; can change and isn't unique. }
+        state: { $ref: "#/components/schemas/ClusterState" }
+        plan: { allOf: [{ $ref: "#/components/schemas/Ref" }], nullable: true, description: null only for a draft. }
+        region: { $ref: "#/components/schemas/Ref" }
+        space: { allOf: [{ $ref: "#/components/schemas/Ref" }], nullable: true, description: Set only for private placement. }
+        release: { $ref: "#/components/schemas/Ref" }
+        single_tenant: { type: boolean }
+        host: { type: string, nullable: true, description: null until provisioned. }
+        port: { type: integer }
+        stats: { $ref: "#/components/schemas/ClusterStats" }
+        latest_action: { allOf: [{ $ref: "#/components/schemas/ActionRef" }], nullable: true }
+        created_at: { type: string, format: date-time }
+        terminated_at: { type: string, format: date-time, nullable: true }
+    ClusterStats:
+      type: object
+      description: From the last index-stats poll. All null until the first poll; never a fake 0.
+      required: [docs, shards, bytes, limits, polled_at]
+      properties:
+        docs: { type: integer, nullable: true }
+        shards: { type: integer, nullable: true }
+        bytes: { type: integer, nullable: true }
+        polled_at: { type: string, format: date-time, nullable: true }
+        limits:
+          allOf: [{ $ref: "#/components/schemas/ClusterLimits" }]
+          nullable: true
+          description: null when the plan has no resource limits on record.
+    ClusterLimits:
+      type: object
+      description: A null limit means unlimited.
+      required: [docs, shards, bytes, daily_bandwidth_bytes]
+      properties:
+        docs: { type: integer, nullable: true }
+        shards: { type: integer, nullable: true }
+        bytes: { type: integer, nullable: true }
+        daily_bandwidth_bytes: { type: integer, nullable: true }
+    ClusterList:
+      allOf:
+        - $ref: "#/components/schemas/PageInfo"
+        - type: object
+          required: [data]
+          properties:
+            data: { type: array, items: { $ref: "#/components/schemas/Cluster" } }
+    ClusterCreate:
+      type: object
+      description: |
+        Without `space`, the cluster goes on shared infrastructure in `region`.
+        An unknown or unavailable plan, region, space or release is `422
+        validation_failed` naming the field, as is an Enterprise plan that
+        needs its own servers, which Bonsai support provisions. Enterprise plans
+        on shared servers can be created here. A field this schema doesn't list,
+        or one that isn't a string, is `400 invalid_parameter`.
+      additionalProperties: false
+      required: [name, plan, region]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 512 }
+        plan: { type: string, description: Plan ID. }
+        region: { type: string, description: "Region ID, e.g. `aws-us-east-1`." }
+        space: { type: string, description: Private space ID. Must be in `region`. }
+        release: { type: string, description: Release ID. Defaults to the plan's best fit. }
+    ClusterUpdate:
+      type: object
+      additionalProperties: false
+      required: [name]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 512 }
+    PlanChange:
+      type: object
+      description: A change the plan's tier can't make (see each plan's tier) is `422 plan_change_refused`.
+      additionalProperties: false
+      required: [plan]
+      properties:
+        plan: { type: string, description: Plan ID. }
+
+    ActionRef:
+      type: object
+      required: [id, type, state]
+      properties:
+        id: { type: string }
+        type: { $ref: "#/components/schemas/ActionType" }
+        state: { $ref: "#/components/schemas/ActionState" }
+    ActionType:
+      type: string
+      x-extensible-enum: [cluster.provision, cluster.deprovision, cluster.change_plan, cluster.read_only, cluster.disable, cluster.enable]
+    ActionState:
+      type: string
+      x-extensible-enum: [new, running, success, error]
+    Action:
+      type: object
+      required: [id, type, state, subject, created_at, finished_at, error, result, steps]
+      properties:
+        id: { type: string, description: "Opaque: `act_` and 16 random characters, in no order. Never changes." }
+        type: { $ref: "#/components/schemas/ActionType" }
+        state: { $ref: "#/components/schemas/ActionState" }
+        subject: { $ref: "#/components/schemas/ActionSubject" }
+        created_at: { type: string, format: date-time }
+        finished_at: { type: string, format: date-time, nullable: true }
+        error:
+          type: object
+          nullable: true
+          required: [code, message]
+          properties:
+            code:
+              type: string
+              description: |-
+                Stable, snake_case. Branch on this, not on `message`.
+                `payment_failed`: Stripe couldn't charge the account (no card,
+                or a declined one), so billing for the cluster couldn't start;
+                `action_url` says where to add a card. Only on Actions the
+                legacy API started; a `/v1` create answers it at once, as a 422. `timed_out`: the Action stopped making
+                progress. `action_failed`: anything else, which Bonsai support
+                can see.
+              x-extensible-enum: [payment_failed, timed_out, action_failed]
+            message: { type: string }
+            action_url:
+              type: string
+              format: uri
+              description: Set on `payment_failed` to a Stripe Checkout page for adding a card, valid for at least an hour after the response; fetch the Action again for a current one. If Stripe can't be reached, the dashboard page where an account Admin or Billing user adds one instead. Absent otherwise.
+        result:
+          type: object
+          nullable: true
+          description: Set on success, for Actions that create something.
+          required: [cluster, credential]
+          properties:
+            cluster: { type: string, nullable: true, description: Cluster ID. }
+            credential: { type: string, nullable: true, description: Credential ID. }
+        steps:
+          type: array
+          description: Customer-facing steps only; internal steps are left out.
+          items: { $ref: "#/components/schemas/ActionStep" }
+    ActionSubject:
+      type: object
+      required: [type, id]
+      properties:
+        type: { type: string, x-extensible-enum: [cluster] }
+        id: { type: string }
+    ActionStep:
+      type: object
+      required: [state, message, at]
+      properties:
+        state: { $ref: "#/components/schemas/ActionState" }
+        message: { type: string }
+        at: { type: string, format: date-time }
+    ActionList:
+      allOf:
+        - $ref: "#/components/schemas/PageInfo"
+        - type: object
+          required: [data]
+          properties:
+            data: { type: array, items: { $ref: "#/components/schemas/Action" } }
+
+    Usage:
+      type: object
+      required: [from, to, samples]
+      properties:
+        from: { type: string, format: date-time }
+        to: { type: string, format: date-time }
+        samples:
+          type: array
+          description: Oldest first. Empty when the cluster was never polled in the range.
+          items:
+            type: object
+            required: [at, bytes, docs, docs_deleted, shards, primary_shards, health]
+            properties:
+              at: { type: string, format: date-time }
+              bytes: { type: integer }
+              docs: { type: integer }
+              docs_deleted: { type: integer }
+              shards: { type: integer }
+              primary_shards: { type: integer }
+              health: { type: string, x-extensible-enum: [green, yellow, red], description: Worst index health. }
+
+    Metrics:
+      type: object
+      required: [from, to, resolution, buckets]
+      properties:
+        from: { type: string, format: date-time }
+        to: { type: string, format: date-time }
+        resolution: { type: string, pattern: "^(1m|30m|1h|6h|12h|1d)$", description: "The bucket size asked for, or the one the server picked." }
+        buckets:
+          type: array
+          items: { $ref: "#/components/schemas/MetricBucket" }
+    MetricBucket:
+      type: object
+      required: [at, requests, writes, responses, duration_ms, duration_histogram, bytes_sent, bytes_received, queue_time_ms, concurrency]
+      properties:
+        at: { type: string, format: date-time }
+        requests: { type: integer }
+        writes: { type: integer }
+        responses:
+          type: object
+          required: [status_2xx_3xx, status_4xx, status_5xx]
+          properties:
+            status_2xx_3xx: { type: integer }
+            status_4xx: { type: integer }
+            status_5xx: { type: integer }
+        duration_ms:
+          type: object
+          description: Percentiles for this bucket. null when there were no requests.
+          required: [p50, p95, p99]
+          properties:
+            p50: { type: number, nullable: true }
+            p95: { type: number, nullable: true }
+            p99: { type: number, nullable: true }
+        duration_histogram:
+          type: array
+          description: |
+            Request counts by duration, always 17 buckets in this order. Each
+            starts at its `min_ms` and ends where the next starts: 0, 10, 20,
+            30, 40, 50, 60, 70, 80, 90, 100, 200, 300, 400, 500, 1000 and 2000
+            (no upper bound).
+          minItems: 17
+          maxItems: 17
+          items:
+            type: object
+            required: [min_ms, count]
+            properties:
+              min_ms: { type: integer }
+              count: { type: integer }
+        bytes_sent: { type: integer }
+        bytes_received: { type: integer }
+        queue_time_ms: { type: number }
+        concurrency: { type: number }
+
+    TopQueries:
+      type: object
+      required: [window, window_start_at, window_end_at, computed_at, queries]
+      properties:
+        window: { type: string, pattern: "^(1h|1d|7d|14d|30d)$" }
+        window_start_at: { type: string, format: date-time }
+        window_end_at: { type: string, format: date-time }
+        computed_at: { type: string, format: date-time }
+        queries:
+          type: array
+          maxItems: 100
+          items:
+            type: object
+            required: [query, volume, avg_duration_ms, avg_hits]
+            properties:
+              query: { type: string, description: "Lowercased, quotes stripped." }
+              volume: { type: integer }
+              avg_duration_ms: { type: number }
+              avg_hits: { type: number }
+
+    Credential:
+      type: object
+      required: [id, name, access_type, allowed_actions, allowed_index_globs, allowed_cidrs, created_at]
+      properties:
+        id: { type: string }
+        name: { type: string, nullable: true }
+        access_type: { type: string, x-extensible-enum: [rw, ro, rwm, acl] }
+        allowed_actions: { type: array, items: { type: string } }
+        allowed_index_globs: { type: array, items: { type: string } }
+        allowed_cidrs: { type: array, items: { type: string } }
+        created_at: { type: string, format: date-time }
+    CredentialWithSecret:
+      allOf:
+        - $ref: "#/components/schemas/Credential"
+        - type: object
+          required: [username, password, url]
+          properties:
+            username: { type: string }
+            password: { type: string }
+            url: { type: string, description: "A complete `https://user:pass@host` URL." }
+    CredentialCreate:
+      type: object
+      required: [name, access_type]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 255, description: A label. }
+        access_type:
+          type: string
+          x-extensible-enum: [rw, ro, rwm, acl]
+          description: Required, so full access is never a default. Which types a cluster takes depends on its plan; `rwm` and `acl` also need a feature enabled for the token's owner (`403 feature_not_enabled`).
+        allowed_actions: { type: array, items: { type: string }, description: For `rwm` and `acl` only. }
+        allowed_index_globs: { type: array, items: { type: string }, description: For `acl` only. }
+        allowed_cidrs: { type: array, items: { type: string }, description: "For `rwm` and `acl` only, e.g. `203.0.113.0/24`." }
+    CredentialList:
+      allOf:
+        - $ref: "#/components/schemas/PageInfo"
+        - type: object
+          required: [data]
+          properties:
+            data: { type: array, items: { $ref: "#/components/schemas/Credential" } }
+
+    Plan:
+      type: object
+      required: [id, name, price_in_cents, billing_interval_months, single_tenant, private_network, regions, releases]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        price_in_cents: { type: integer }
+        billing_interval_months: { type: integer }
+        single_tenant: { type: boolean }
+        private_network: { type: boolean }
+        regions: { type: array, items: { type: string }, description: Region IDs this plan can use. }
+        releases: { type: array, items: { type: string }, description: Release IDs this plan can use. }
+    PlanList:
+      allOf:
+        - $ref: "#/components/schemas/PageInfo"
+        - type: object
+          required: [data]
+          properties:
+            data: { type: array, items: { $ref: "#/components/schemas/Plan" } }
+    Region:
+      type: object
+      required: [id, name, cloud, cloud_region]
+      properties:
+        id: { type: string, description: "e.g. `aws-us-east-1`." }
+        name: { type: string }
+        cloud: { type: string, x-extensible-enum: [aws, gcp] }
+        cloud_region: { type: string, description: "The provider's own name, e.g. `us-east-1`." }
+    RegionList:
+      allOf:
+        - $ref: "#/components/schemas/PageInfo"
+        - type: object
+          required: [data]
+          properties:
+            data: { type: array, items: { $ref: "#/components/schemas/Region" } }
+    Space:
+      type: object
+      required: [id, name, region, private_network]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        region: { type: string, description: Region ID. }
+        private_network: { type: boolean }
+    SpaceList:
+      allOf:
+        - $ref: "#/components/schemas/PageInfo"
+        - type: object
+          required: [data]
+          properties:
+            data: { type: array, items: { $ref: "#/components/schemas/Space" } }
+    Release:
+      type: object
+      required: [id, name, engine, version]
+      properties:
+        id: { type: string, description: "e.g. `opensearch-2.19.0`." }
+        name: { type: string }
+        engine: { type: string, x-extensible-enum: [elasticsearch, opensearch] }
+        version: { type: string }
+    ReleaseList:
+      allOf:
+        - $ref: "#/components/schemas/PageInfo"
+        - type: object
+          required: [data]
+          properties:
+            data: { type: array, items: { $ref: "#/components/schemas/Release" } }
