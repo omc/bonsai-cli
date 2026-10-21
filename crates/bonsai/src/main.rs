@@ -97,11 +97,24 @@ fn run() -> u8 {
     };
     if let Some(update) = update
         && !ctx.cancel.is_cancelled()
-        && let Ok(Ok(Some(line))) = runtime.block_on(tokio::time::timeout(update::WAIT, update))
+        && let Some(line) = update_notice(&runtime, update)
     {
         ctx.out.info(&line);
     }
     code
+}
+
+/// The update check's notice, if it finishes within `update::WAIT`. The timeout is
+/// built inside `block_on`: its timer needs the runtime's context, which isn't
+/// entered while `block_on`'s argument is evaluated.
+fn update_notice(
+    runtime: &tokio::runtime::Runtime,
+    check: tokio::task::JoinHandle<Option<String>>,
+) -> Option<String> {
+    runtime
+        .block_on(async { tokio::time::timeout(update::WAIT, check).await })
+        .ok()?
+        .ok()?
 }
 
 /// The first Ctrl-C fires `cancel`, so a wait stops and reports what it left; the
@@ -164,5 +177,18 @@ mod tests {
         let line = super::crash_line("bad header \u{1b}[2J\u{202e}x\r");
         assert!(!line.contains(['\u{1b}', '\u{202e}', '\r']), "{line:?}");
         assert!(line.starts_with("✗ bonsai crashed"));
+    }
+
+    #[test]
+    fn the_update_notice_is_awaited_on_the_runtime() {
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        let check = runtime.spawn(async { Some("update available".to_owned()) });
+        assert_eq!(
+            super::update_notice(&runtime, check).as_deref(),
+            Some("update available")
+        );
     }
 }
