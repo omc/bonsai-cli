@@ -1,0 +1,11 @@
+---
+source: crates/bonsai/tests/e2e.rs
+expression: stdout
+---
+Account     Acme Search (acme)
+Profile     default
+API         http://127.0.0.1:PORT/v1
+Token       env (BONSAI_TOKEN)
+Token name  Seed token
+Scopes      account:read, clusters:read, clusters:write, credentials:read, credentials:write, query_logs:read
+Expires     never

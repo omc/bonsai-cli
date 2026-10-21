@@ -1,0 +1,14 @@
+---
+source: crates/bonsai/tests/e2e_cluster.rs
+expression: text(&out.stdout)
+---
+act_[ID]  cluster.change_plan  success  [AGO]
+  ✓ Checking capacity  [AGO]
+  ✓ Changing plan  [AGO]
+  ✓ Updating billing  [AGO]
+
+act_[ID]  cluster.provision  success  [AGO]
+  ✓ Reserving capacity  [AGO]
+  ✓ Provisioning cluster  [AGO]
+  ✓ Configuring routes  [AGO]
+  ✓ Running health check  [AGO]

@@ -1,0 +1,36 @@
+---
+source: crates/bonsai/tests/e2e_observe.rs
+expression: text
+---
+ID                              NAME               PRICE
+business-2x                     Business 2X        $2,500/mo
+business-2x-esplat              Business 2X        $3,000/mo
+business-capacity-2x            Business Capacit…  $4,000/mo
+business-capacity-2x-esplat     Business Capacit…  $4,800/mo
+business-capacity-lg            Business Capacit…  $1,000/mo
+business-capacity-lg-esplat     Business Capacit…  $1,200/mo
+business-capacity-xl            Business Capacit…  $2,000/mo
+business-capacity-xl-esplat     Business Capacit…  $2,400/mo
+business-lg                     Business Large     $650/mo
+business-lg-esplat              Business Large     $780/mo
+business-memory-2x              Business Memory …  $2,950/mo
+business-performance-2x         Business Perform…  $1,700/mo
+business-performance-2x-esplat  Business Perform…  $2,040/mo
+business-performance-4x         Business Perform…  $3,400/mo
+business-performance-4x-esplat  Business Perform…  $4,080/mo
+business-performance-8x         Business Perform…  $6,800/mo
+business-performance-8x-esplat  Business Perform…  $8,160/mo
+business-performance-lg         Business Perform…  $600/mo
+business-performance-lg-esplat  Business Perform…  $720/mo
+business-performance-xl         Business Perform…  $850/mo
+business-performance-xl-esplat  Business Perform…  $1,020/mo
+business-xl                     Business XL        $1,300/mo
+business-xl-esplat              Business XL        $1,560/mo
+sandbox                         Sandbox            Free
+staging                         Staging            $15/mo
+standard-birch                  Standard Birch     $90/mo
+standard-cork                   Standard Cork      $150/mo
+standard-elm                    Standard Elm       $50/mo
+standard-fir                    Standard Fir       $20/mo
+standard-oak                    Standard Oak       $400/mo
+standard-teak                   Standard Teak      $250/mo

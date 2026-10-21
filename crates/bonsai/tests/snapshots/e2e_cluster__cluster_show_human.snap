@@ -1,0 +1,16 @@
+---
+source: crates/bonsai/tests/e2e_cluster.rs
+expression: text(&out.stdout)
+---
+Name           snap
+ID             snap-[ID]
+State          ready
+Plan           Sandbox (sandbox)
+Region         AWS US East (Virginia) (aws-us-east-1)
+Release        OpenSearch 3.8.0 (opensearch-3.8.0)
+Host           snap-[ID].us-east-1.bonsaisearch.net
+Docs           2,500 / 35,000 (7%)
+Shards         1 / 10 (10%)
+Size           48.0 MiB / 119.2 MiB (40%)
+Latest action  cluster.provision success (act_[ID])
+Created        [TIMESTAMP] ([AGO])
