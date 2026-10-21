@@ -32,7 +32,7 @@ async fn slow_env() -> Env {
 
 /// A call to the mock's admin API, which must answer 204.
 async fn admin(env: &Env, method: reqwest::Method, path: &str, body: Value) {
-    let res = reqwest::Client::builder()
+    let res = bonsai_api::http_client()
         .no_proxy()
         .build()
         .unwrap()

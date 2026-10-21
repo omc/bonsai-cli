@@ -38,7 +38,9 @@ async fn set_scenario(env: &Env, key: &str, value: Value) {
         .origin
         .join(&format!("_mock/scenario/{key}"))
         .unwrap();
-    let res = reqwest::Client::new()
+    let res = bonsai_api::http_client()
+        .build()
+        .unwrap()
         .put(url)
         .bearer_auth(&env.mock.admin_token)
         .json(&value)
@@ -520,7 +522,7 @@ async fn queries_sanitized() {
 /// `path` under `/v1` straight from the mock, as the server sent it.
 async fn server_json(env: &Env, path: &str) -> Value {
     let url = format!("{}{path}", env.mock.base_url.as_str().trim_end_matches('/'));
-    reqwest::Client::builder()
+    bonsai_api::http_client()
         .no_proxy()
         .build()
         .unwrap()

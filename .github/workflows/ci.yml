@@ -67,7 +67,7 @@ jobs:
       - uses: EmbarkStudios/cargo-deny-action@v2
 
   # The release builds static musl binaries (dist-workspace.toml); build them on
-  # every PR too, so an aws-lc-rs or musl link problem shows before a tag.
+  # every PR too, so a musl link problem shows before a tag.
   musl:
     needs: [fmt, clippy, deny]
     strategy:

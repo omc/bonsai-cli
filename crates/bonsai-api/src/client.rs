@@ -99,7 +99,7 @@ impl Client {
         let user_agent = HeaderValue::from_str(&cfg.user_agent)
             .map_err(|_| ApiError::Config("the user agent isn't a valid header value".into()))?;
 
-        let mut builder = reqwest::Client::builder()
+        let mut builder = http_client()
             .connect_timeout(CONNECT_TIMEOUT)
             .redirect(reqwest::redirect::Policy::none());
         if let Some(path) = &cfg.ca_bundle {
@@ -512,6 +512,14 @@ impl Client {
         }
         req
     }
+}
+
+/// A reqwest builder with rustls' ring provider installed. reqwest is built with
+/// `rustls-no-provider` and panics on `build()` without one, so every client starts here.
+pub fn http_client() -> reqwest::ClientBuilder {
+    // Fails only when a provider is already installed, which is the goal.
+    let _ = rustls::crypto::ring::default_provider().install_default();
+    reqwest::Client::builder()
 }
 
 /// True for `localhost`, `127.0.0.1` and `[::1]` (matched on the parsed host,

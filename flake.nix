@@ -37,9 +37,6 @@
             "bonsai"
           ];
 
-          # aws-lc-sys builds with cmake.
-          nativeBuildInputs = [ pkgs.cmake ];
-
           # The tests need the mock and a keychain; CI runs them.
           doCheck = false;
 

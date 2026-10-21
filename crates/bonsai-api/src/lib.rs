@@ -7,7 +7,7 @@ pub mod pagination;
 pub mod problem;
 pub mod retry;
 
-pub use client::{Client, ClientConfig, ClusterQuery, Response, is_loopback_host};
+pub use client::{Client, ClientConfig, ClusterQuery, Response, http_client, is_loopback_host};
 pub use enums::*;
 pub use models::*;
 pub use pagination::collect_pages;

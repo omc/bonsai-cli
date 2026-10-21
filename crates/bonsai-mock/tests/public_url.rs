@@ -28,7 +28,7 @@ async fn serve(public_url: Option<&str>, checkout_url: Option<&str>) -> Served {
     )
     .await
     .unwrap();
-    let http = reqwest::Client::builder().no_proxy().build().unwrap();
+    let http = bonsai_api::http_client().no_proxy().build().unwrap();
     Served {
         h,
         db_path,

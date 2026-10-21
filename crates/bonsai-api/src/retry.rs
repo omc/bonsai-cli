@@ -273,7 +273,7 @@ mod tests {
     /// environment, which would otherwise do the DNS lookup itself.
     #[tokio::test]
     async fn does_not_retry_dns_failures() {
-        let http = reqwest::Client::builder().no_proxy().build().unwrap();
+        let http = crate::http_client().no_proxy().build().unwrap();
         let attempts = AtomicUsize::new(0);
         let policy = RetryPolicy {
             base: Duration::from_millis(10),

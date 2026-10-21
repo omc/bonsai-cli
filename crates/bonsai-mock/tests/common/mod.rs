@@ -59,7 +59,7 @@ impl Mock {
                 .clone()
         };
         let (acme, globex) = (token("acme"), token("globex"));
-        let http = reqwest::Client::builder()
+        let http = bonsai_api::http_client()
             .no_proxy()
             .redirect(reqwest::redirect::Policy::none())
             .build()

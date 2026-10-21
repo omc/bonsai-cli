@@ -290,7 +290,9 @@ async fn login_on_the_web() {
         .origin
         .join(&format!("_mock/cli/logins/{code}/approve"))
         .unwrap();
-    let res = reqwest::Client::new()
+    let res = bonsai_api::http_client()
+        .build()
+        .unwrap()
         .post(approve)
         .bearer_auth(&env.mock.admin_token)
         .json(&json!({}))
@@ -694,7 +696,9 @@ async fn a_malformed_config_names_the_parse_error_once() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn json_errors_are_the_problem_as_the_server_sent_it() {
     let env = Env::start().await;
-    let direct: Value = reqwest::Client::new()
+    let direct: Value = bonsai_api::http_client()
+        .build()
+        .unwrap()
         .get(format!("{}/account", env.mock.base_url))
         .bearer_auth("bonsai_nope_nope")
         .send()

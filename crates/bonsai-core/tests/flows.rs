@@ -64,7 +64,7 @@ impl Env {
             .unwrap()
             .token
             .clone();
-        let http = reqwest::Client::builder().no_proxy().build().unwrap();
+        let http = bonsai_api::http_client().no_proxy().build().unwrap();
         Self {
             h,
             acme,

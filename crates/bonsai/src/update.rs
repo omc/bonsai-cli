@@ -39,7 +39,7 @@ pub async fn check(config_dir: PathBuf) -> Option<String> {
     if let Err(e) = record_check(&config_dir, now) {
         tracing::debug!(error = %e, "can't record the update check");
     }
-    let client = reqwest::Client::builder()
+    let client = bonsai_api::http_client()
         .user_agent(crate::commands::user_agent())
         .timeout(WAIT)
         .build()
@@ -242,7 +242,7 @@ mod tests {
             )
             .mount(&server)
             .await;
-        let client = reqwest::Client::builder()
+        let client = bonsai_api::http_client()
             .user_agent("test")
             .build()
             .unwrap();
@@ -257,7 +257,7 @@ mod tests {
             .respond_with(ResponseTemplate::new(404))
             .mount(&server)
             .await;
-        let client = reqwest::Client::new();
+        let client = bonsai_api::http_client().build().unwrap();
         assert!(latest(&client, &server.uri()).await.is_err());
     }
 }
