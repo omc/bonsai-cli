@@ -1,10 +1,8 @@
 //! The `/_mock` admin API, the checkout page, `/v1/openapi.json`, and what a
 //! wrong method on a `/v1` path answers.
 
-mod common;
-
+use crate::common::{Mock, create_body, header};
 use bonsai_mock::scenario;
-use common::{Mock, create_body, header};
 use serde_json::{Value, json};
 
 #[tokio::test]
@@ -283,7 +281,7 @@ async fn openapi_json_is_the_contract() {
             .starts_with("application/json")
     );
     let spec = body.unwrap();
-    let yaml: Value = serde_yaml::from_str(include_str!("../../../openapi/v1.yml")).unwrap();
+    let yaml: Value = serde_yaml::from_str(include_str!("../../../../openapi/v1.yml")).unwrap();
     assert_eq!(spec, yaml);
 
     // The root points at it.

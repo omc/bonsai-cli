@@ -2,10 +2,8 @@
 //! conventions (auth, scopes, pagination, rate limits). Every call goes through
 //! `Mock::call`, which validates the response against `openapi/v1.yml`.
 
-mod common;
-
+use crate::common::{Mock, header};
 use bonsai_mock::{scenario, seed};
-use common::{Mock, header};
 use serde_json::{Value, json};
 
 fn ids(body: &Value) -> Vec<String> {

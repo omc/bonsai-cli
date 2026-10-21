@@ -3,10 +3,8 @@
 //! goes through `Mock::call`, which validates the response against
 //! `openapi/v1.yml`.
 
-mod common;
-
+use crate::common::{Mock, header};
 use bonsai_mock::{scenario, seed};
-use common::{Mock, header};
 use jiff::{SignedDuration, Timestamp};
 use serde_json::{Value, json};
 

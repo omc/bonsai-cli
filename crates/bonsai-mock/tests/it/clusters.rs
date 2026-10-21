@@ -3,10 +3,8 @@
 //! idempotency. Every call goes through `Mock::call`, which validates the
 //! response against `openapi/v1.yml`.
 
-mod common;
-
+use crate::common::{Mock, create_body, header};
 use bonsai_mock::{scenario, seed};
-use common::{Mock, create_body, header};
 use serde_json::{Value, json};
 
 fn ids(body: &Value) -> Vec<String> {

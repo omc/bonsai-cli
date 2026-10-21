@@ -2,9 +2,7 @@
 //! time. Every call goes through `Mock::call`, which validates the response
 //! against `openapi/v1.yml`.
 
-mod common;
-
-use common::{Mock, header};
+use crate::common::{Mock, header};
 use serde_json::json;
 
 fn is_action_id(id: &str) -> bool {

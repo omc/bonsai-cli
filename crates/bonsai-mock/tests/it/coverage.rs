@@ -7,11 +7,9 @@
 //! [`ALLOWED_GAPS`] with its reason, and a listed gap the test does produce
 //! fails the test, so the list stays honest. `500` isn't documented anywhere.
 
-mod common;
-
 use std::collections::BTreeSet;
 
-use common::{Mock, create_body};
+use crate::common::{Mock, create_body};
 use serde_json::{Value, json};
 
 /// `(operationId, status, why the mock never answers with it)`.

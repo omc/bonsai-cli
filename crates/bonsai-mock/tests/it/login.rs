@@ -3,10 +3,8 @@
 //! They aren't in the contract, so these tests check them by hand through
 //! `Mock::call_unchecked`.
 
-mod common;
-
+use crate::common::{Mock, header};
 use bonsai_mock::seed;
-use common::{Mock, header};
 use jiff::{SignedDuration, Timestamp};
 use serde_json::{Value, json};
 

@@ -1,10 +1,8 @@
 //! `MockOptions::public_url` and `checkout_url`: what the demo's `--public-url`
 //! and `--checkout-url` flags set.
 
-mod common;
-
+use crate::common::create_body;
 use bonsai_mock::{MockOptions, seed};
-use common::create_body;
 use serde_json::Value;
 
 struct Served {

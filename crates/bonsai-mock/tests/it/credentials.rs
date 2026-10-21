@@ -2,10 +2,8 @@
 //! `getClusterCredential`, `revokeClusterCredential`). Every call goes through
 //! `Mock::call`, which validates the response against `openapi/v1.yml`.
 
-mod common;
-
+use crate::common::{Mock, header};
 use bonsai_mock::seed;
-use common::{Mock, header};
 use serde_json::{Value, json};
 
 const LAST_RW: &str = "The cluster's last active rw credential can't be revoked.";
@@ -246,7 +244,7 @@ async fn rwm_and_acl_need_the_feature() {
             "POST",
             "/clusters",
             Some(&token),
-            Some(common::create_body("Globex", "sandbox")),
+            Some(crate::common::create_body("Globex", "sandbox")),
             &[],
         )
         .await;
