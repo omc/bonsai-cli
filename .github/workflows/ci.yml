@@ -2,7 +2,7 @@ name: ci
 
 on:
   push:
-    branches: [main]
+    branches: ["**"]
   pull_request:
   # release.yml runs this alongside its builds and publishes only if it passes,
   # so a tag on a commit that fails CI ships nothing. dist passes its plan; unused.
