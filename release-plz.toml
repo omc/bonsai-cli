@@ -1,0 +1,14 @@
+# release-plz opens the release PR (version bump + changelog) and tags the release. It does
+# not create the GitHub release and does not publish: dist builds and publishes the release
+# when the tag is pushed (.github/workflows/release.yml), and the crates are `publish = false`.
+# Only `bonsai` is released, tagged `v<version>`: dist's trigger matches any `*X.Y.Z*` tag, so
+# per-crate tags (`<package>-v<version>`) would each start a release run.
+[workspace]
+release = false
+git_release_enable = false
+publish = false
+
+[[package]]
+name = "bonsai"
+release = true
+git_tag_name = "v{{ version }}"
