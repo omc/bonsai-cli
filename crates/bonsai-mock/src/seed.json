@@ -1,0 +1,861 @@
+{
+  "accounts": [
+    {
+      "id": "acme",
+      "name": "Acme Search",
+      "contact_email_override": null,
+      "created_at": "2024-03-01T12:00:00Z",
+      "has_payment_method": true,
+      "billed_by_invoice": false,
+      "advanced_credentials": true
+    },
+    {
+      "id": "globex",
+      "name": "Globex",
+      "contact_email_override": "ops@globex.example",
+      "created_at": "2025-01-15T09:30:00Z",
+      "has_payment_method": false,
+      "billed_by_invoice": false,
+      "advanced_credentials": false
+    }
+  ],
+  "regions": [
+    {
+      "id": "aws-ap-southeast-2",
+      "name": "AWS Asia Pacific (Sydney)",
+      "cloud": "aws",
+      "cloud_region": "ap-southeast-2"
+    },
+    {
+      "id": "aws-eu-central-1",
+      "name": "AWS Germany (Frankfurt)",
+      "cloud": "aws",
+      "cloud_region": "eu-central-1"
+    },
+    {
+      "id": "aws-eu-west-1",
+      "name": "AWS EU West (Ireland)",
+      "cloud": "aws",
+      "cloud_region": "eu-west-1"
+    },
+    {
+      "id": "aws-us-east-1",
+      "name": "AWS US East (Virginia)",
+      "cloud": "aws",
+      "cloud_region": "us-east-1"
+    },
+    {
+      "id": "aws-us-west-2",
+      "name": "AWS US West (Oregon)",
+      "cloud": "aws",
+      "cloud_region": "us-west-2"
+    },
+    {
+      "id": "gcp-us-east4",
+      "name": "GCP North Virginia",
+      "cloud": "gcp",
+      "cloud_region": "us-east4"
+    }
+  ],
+  "releases": [
+    {
+      "id": "elasticsearch-7.2.0",
+      "name": "Elasticsearch 7.2.0",
+      "engine": "elasticsearch",
+      "version": "7.2.0"
+    },
+    {
+      "id": "elasticsearch-7.10.2",
+      "name": "Elasticsearch 7.10.2",
+      "engine": "elasticsearch",
+      "version": "7.10.2"
+    },
+    {
+      "id": "elasticsearch-8.17.5",
+      "name": "Elasticsearch 8.17.5",
+      "engine": "elasticsearch",
+      "version": "8.17.5"
+    },
+    {
+      "id": "elasticsearch-9.4.1",
+      "name": "Elasticsearch 9.4.1",
+      "engine": "elasticsearch",
+      "version": "9.4.1"
+    },
+    {
+      "id": "opensearch-2.6.0-mt",
+      "name": "OpenSearch 2.6.0",
+      "engine": "opensearch",
+      "version": "2.6.0"
+    },
+    {
+      "id": "opensearch-2.6.0",
+      "name": "OpenSearch 2.6.0",
+      "engine": "opensearch",
+      "version": "2.6.0"
+    },
+    {
+      "id": "opensearch-2.19.2",
+      "name": "OpenSearch 2.19.2",
+      "engine": "opensearch",
+      "version": "2.19.2"
+    },
+    {
+      "id": "opensearch-2.19.3",
+      "name": "Opensearch 2.19.3",
+      "engine": "opensearch",
+      "version": "2.19.3"
+    },
+    {
+      "id": "opensearch-2.19.6",
+      "name": "Opensearch 2.19.6",
+      "engine": "opensearch",
+      "version": "2.19.6"
+    },
+    {
+      "id": "opensearch-3.8.0",
+      "name": "OpenSearch 3.8.0",
+      "engine": "opensearch",
+      "version": "3.8.0"
+    }
+  ],
+  "plans": [
+    {
+      "id": "business-2x",
+      "name": "Business 2X",
+      "price_in_cents": 250000,
+      "billing_interval_months": 1,
+      "single_tenant": true,
+      "private_network": true,
+      "tier": "business",
+      "dedicated": false,
+      "releases": ["opensearch-3.8.0", "opensearch-2.19.6", "opensearch-2.19.3", "opensearch-2.19.2", "opensearch-2.6.0-mt", "opensearch-2.6.0", "elasticsearch-7.10.2", "elasticsearch-7.2.0"],
+      "offers": {
+        "aws-ap-southeast-2": ["opensearch-3.8.0", "opensearch-2.19.6", "opensearch-2.6.0-mt", "opensearch-2.6.0", "elasticsearch-7.10.2", "elasticsearch-7.2.0"],
+        "aws-eu-central-1": ["opensearch-3.8.0", "opensearch-2.19.6", "opensearch-2.6.0-mt", "opensearch-2.6.0", "elasticsearch-7.10.2", "elasticsearch-7.2.0"],
+        "aws-eu-west-1": ["opensearch-3.8.0", "opensearch-2.19.6", "opensearch-2.6.0-mt", "opensearch-2.6.0", "elasticsearch-7.10.2", "elasticsearch-7.2.0"],
+        "aws-us-east-1": ["opensearch-3.8.0", "opensearch-2.19.6", "opensearch-2.6.0-mt", "opensearch-2.6.0", "elasticsearch-7.10.2", "elasticsearch-7.2.0"],
+        "aws-us-west-2": ["opensearch-3.8.0", "opensearch-2.19.6", "opensearch-2.19.3", "opensearch-2.19.2", "opensearch-2.6.0-mt", "opensearch-2.6.0", "elasticsearch-7.10.2", "elasticsearch-7.2.0"],
+        "gcp-us-east4": ["opensearch-3.8.0", "opensearch-2.19.6", "opensearch-2.19.3", "opensearch-2.6.0", "elasticsearch-7.10.2", "elasticsearch-7.2.0"]
+      },
+      "max_credentials": 100,
+      "limit_docs": null,
+      "limit_shards": null,
+      "limit_bytes": 1422000000000,
+      "limit_bandwidth": 100000000000
+    },
+    {
+      "id": "business-2x-esplat",
+      "name": "Business 2X",
+      "price_in_cents": 300000,
+      "billing_interval_months": 1,
+      "single_tenant": true,
+      "private_network": true,
+      "tier": "business",
+      "dedicated": false,
+      "releases": ["elasticsearch-9.4.1", "elasticsearch-8.17.5"],
+      "offers": {
+        "aws-ap-southeast-2": ["elasticsearch-8.17.5"],
+        "aws-eu-central-1": ["elasticsearch-8.17.5"],
+        "aws-eu-west-1": ["elasticsearch-8.17.5"],
+        "aws-us-east-1": ["elasticsearch-8.17.5"],
+        "aws-us-west-2": ["elasticsearch-8.17.5"],
+        "gcp-us-east4": ["elasticsearch-9.4.1", "elasticsearch-8.17.5"]
+      },
+      "max_credentials": 100,
+      "limit_docs": null,
+      "limit_shards": null,
+      "limit_bytes": 1422000000000,
+      "limit_bandwidth": 100000000000
+    },
+    {
+      "id": "business-capacity-2x",
+      "name": "Business Capacity 2X",
+      "price_in_cents": 400000,
+      "billing_interval_months": 1,
+      "single_tenant": true,
+      "private_network": true,
+      "tier": "business",
+      "dedicated": false,
+      "releases": ["opensearch-3.8.0", "opensearch-2.19.6", "opensearch-2.19.3", "opensearch-2.19.2", "opensearch-2.6.0-mt", "opensearch-2.6.0", "elasticsearch-7.10.2", "elasticsearch-7.2.0"],
+      "offers": {
+        "aws-ap-southeast-2": ["opensearch-3.8.0", "opensearch-2.19.6", "opensearch-2.6.0-mt", "opensearch-2.6.0", "elasticsearch-7.10.2", "elasticsearch-7.2.0"],
+        "aws-eu-central-1": ["opensearch-3.8.0", "opensearch-2.19.6", "opensearch-2.6.0-mt", "opensearch-2.6.0", "elasticsearch-7.10.2", "elasticsearch-7.2.0"],
+        "aws-eu-west-1": ["opensearch-3.8.0", "opensearch-2.19.6", "opensearch-2.6.0-mt", "opensearch-2.6.0", "elasticsearch-7.10.2", "elasticsearch-7.2.0"],
+        "aws-us-east-1": ["opensearch-3.8.0", "opensearch-2.19.6", "opensearch-2.6.0-mt", "opensearch-2.6.0", "elasticsearch-7.10.2", "elasticsearch-7.2.0"],
+        "aws-us-west-2": ["opensearch-3.8.0", "opensearch-2.19.6", "opensearch-2.19.3", "opensearch-2.19.2", "opensearch-2.6.0-mt", "opensearch-2.6.0", "elasticsearch-7.10.2", "elasticsearch-7.2.0"],
+        "gcp-us-east4": ["opensearch-3.8.0", "opensearch-2.19.6", "opensearch-2.19.3", "opensearch-2.6.0", "elasticsearch-7.10.2", "elasticsearch-7.2.0"]
+      },
+      "max_credentials": 100,
+      "limit_docs": null,
+      "limit_shards": null,
+      "limit_bytes": 5625000000,
+      "limit_bandwidth": 100000000000
+    },
+    {
+      "id": "business-capacity-2x-esplat",
+      "name": "Business Capacity 2X",
+      "price_in_cents": 480000,
+      "billing_interval_months": 1,
+      "single_tenant": true,
+      "private_network": true,
+      "tier": "business",
+      "dedicated": false,
+      "releases": ["elasticsearch-9.4.1", "elasticsearch-8.17.5"],
+      "offers": {
+        "aws-ap-southeast-2": ["elasticsearch-8.17.5"],
+        "aws-eu-central-1": ["elasticsearch-8.17.5"],
+        "aws-eu-west-1": ["elasticsearch-8.17.5"],
+        "aws-us-east-1": ["elasticsearch-8.17.5"],
+        "aws-us-west-2": ["elasticsearch-8.17.5"],
+        "gcp-us-east4": ["elasticsearch-9.4.1", "elasticsearch-8.17.5"]
+      },
+      "max_credentials": 100,
+      "limit_docs": null,
+      "limit_shards": null,
+      "limit_bytes": 5625000000,
+      "limit_bandwidth": 100000000000
+    },
+    {
+      "id": "business-capacity-lg",
+      "name": "Business Capacity Large",
+      "price_in_cents": 100000,
+      "billing_interval_months": 1,
+      "single_tenant": true,
+      "private_network": true,
+      "tier": "business",
+      "dedicated": false,
+      "releases": ["opensearch-3.8.0", "opensearch-2.19.6", "opensearch-2.19.3", "opensearch-2.19.2", "opensearch-2.6.0-mt", "opensearch-2.6.0", "elasticsearch-7.10.2", "elasticsearch-7.2.0"],
+      "offers": {
+        "aws-ap-southeast-2": ["opensearch-3.8.0", "opensearch-2.19.6", "opensearch-2.6.0-mt", "opensearch-2.6.0", "elasticsearch-7.10.2", "elasticsearch-7.2.0"],
+        "aws-eu-central-1": ["opensearch-3.8.0", "opensearch-2.19.6", "opensearch-2.6.0-mt", "opensearch-2.6.0", "elasticsearch-7.10.2", "elasticsearch-7.2.0"],
+        "aws-eu-west-1": ["opensearch-3.8.0", "opensearch-2.19.6", "opensearch-2.6.0-mt", "opensearch-2.6.0", "elasticsearch-7.10.2", "elasticsearch-7.2.0"],
+        "aws-us-east-1": ["opensearch-3.8.0", "opensearch-2.19.6", "opensearch-2.6.0-mt", "opensearch-2.6.0", "elasticsearch-7.10.2", "elasticsearch-7.2.0"],
+        "aws-us-west-2": ["opensearch-3.8.0", "opensearch-2.19.6", "opensearch-2.19.3", "opensearch-2.19.2", "opensearch-2.6.0-mt", "opensearch-2.6.0", "elasticsearch-7.10.2", "elasticsearch-7.2.0"],
+        "gcp-us-east4": ["opensearch-3.8.0", "opensearch-2.19.6", "opensearch-2.19.3", "opensearch-2.6.0", "elasticsearch-7.10.2", "elasticsearch-7.2.0"]
+      },
+      "max_credentials": 100,
+      "limit_docs": null,
+      "limit_shards": null,
+      "limit_bytes": 1404000000000,
+      "limit_bandwidth": 25000000000
+    },
+    {
+      "id": "business-capacity-lg-esplat",
+      "name": "Business Capacity Large",
+      "price_in_cents": 120000,
+      "billing_interval_months": 1,
+      "single_tenant": true,
+      "private_network": true,
+      "tier": "business",
+      "dedicated": false,
+      "releases": ["elasticsearch-9.4.1", "elasticsearch-8.17.5"],
+      "offers": {
+        "aws-ap-southeast-2": ["elasticsearch-8.17.5"],
+        "aws-eu-central-1": ["elasticsearch-8.17.5"],
+        "aws-eu-west-1": ["elasticsearch-8.17.5"],
+        "aws-us-east-1": ["elasticsearch-8.17.5"],
+        "aws-us-west-2": ["elasticsearch-8.17.5"],
+        "gcp-us-east4": ["elasticsearch-9.4.1", "elasticsearch-8.17.5"]
+      },
+      "max_credentials": 100,
+      "limit_docs": null,
+      "limit_shards": null,
+      "limit_bytes": 1404000000000,
+      "limit_bandwidth": 25000000000
+    },
+    {
+      "id": "business-capacity-xl",
+      "name": "Business Capacity XL",
+      "price_in_cents": 200000,
+      "billing_interval_months": 1,
+      "single_tenant": true,
+      "private_network": true,
+      "tier": "business",
+      "dedicated": false,
+      "releases": ["opensearch-3.8.0", "opensearch-2.19.6", "opensearch-2.19.3", "opensearch-2.19.2", "opensearch-2.6.0-mt", "opensearch-2.6.0", "elasticsearch-7.10.2", "elasticsearch-7.2.0"],
+      "offers": {
+        "aws-ap-southeast-2": ["opensearch-3.8.0", "opensearch-2.19.6", "opensearch-2.6.0-mt", "opensearch-2.6.0", "elasticsearch-7.10.2", "elasticsearch-7.2.0"],
+        "aws-eu-central-1": ["opensearch-3.8.0", "opensearch-2.19.6", "opensearch-2.6.0-mt", "opensearch-2.6.0", "elasticsearch-7.10.2", "elasticsearch-7.2.0"],
+        "aws-eu-west-1": ["opensearch-3.8.0", "opensearch-2.19.6", "opensearch-2.6.0-mt", "opensearch-2.6.0", "elasticsearch-7.10.2", "elasticsearch-7.2.0"],
+        "aws-us-east-1": ["opensearch-3.8.0", "opensearch-2.19.6", "opensearch-2.6.0-mt", "opensearch-2.6.0", "elasticsearch-7.10.2", "elasticsearch-7.2.0"],
+        "aws-us-west-2": ["opensearch-3.8.0", "opensearch-2.19.6", "opensearch-2.19.3", "opensearch-2.19.2", "opensearch-2.6.0-mt", "opensearch-2.6.0", "elasticsearch-7.10.2", "elasticsearch-7.2.0"],
+        "gcp-us-east4": ["opensearch-3.8.0", "opensearch-2.19.6", "opensearch-2.19.3", "opensearch-2.6.0", "elasticsearch-7.10.2", "elasticsearch-7.2.0"]
+      },
+      "max_credentials": 100,
+      "limit_docs": null,
+      "limit_shards": null,
+      "limit_bytes": 2811000000000,
+      "limit_bandwidth": 50000000000
+    },
+    {
+      "id": "business-capacity-xl-esplat",
+      "name": "Business Capacity XL",
+      "price_in_cents": 240000,
+      "billing_interval_months": 1,
+      "single_tenant": true,
+      "private_network": true,
+      "tier": "business",
+      "dedicated": false,
+      "releases": ["elasticsearch-9.4.1", "elasticsearch-8.17.5"],
+      "offers": {
+        "aws-ap-southeast-2": ["elasticsearch-8.17.5"],
+        "aws-eu-central-1": ["elasticsearch-8.17.5"],
+        "aws-eu-west-1": ["elasticsearch-8.17.5"],
+        "aws-us-east-1": ["elasticsearch-8.17.5"],
+        "aws-us-west-2": ["elasticsearch-8.17.5"],
+        "gcp-us-east4": ["elasticsearch-9.4.1", "elasticsearch-8.17.5"]
+      },
+      "max_credentials": 100,
+      "limit_docs": null,
+      "limit_shards": null,
+      "limit_bytes": 2811000000000,
+      "limit_bandwidth": 50000000000
+    },
+    {
+      "id": "business-lg",
+      "name": "Business Large",
+      "price_in_cents": 65000,
+      "billing_interval_months": 1,
+      "single_tenant": true,
+      "private_network": true,
+      "tier": "business",
+      "dedicated": false,
+      "releases": ["opensearch-3.8.0", "opensearch-2.19.6", "opensearch-2.19.3", "opensearch-2.19.2", "opensearch-2.6.0-mt", "opensearch-2.6.0", "elasticsearch-7.10.2", "elasticsearch-7.2.0"],
+      "offers": {
+        "aws-ap-southeast-2": ["opensearch-3.8.0", "opensearch-2.19.6", "opensearch-2.6.0-mt", "opensearch-2.6.0", "elasticsearch-7.10.2", "elasticsearch-7.2.0"],
+        "aws-eu-central-1": ["opensearch-3.8.0", "opensearch-2.19.6", "opensearch-2.6.0-mt", "opensearch-2.6.0", "elasticsearch-7.10.2", "elasticsearch-7.2.0"],
+        "aws-eu-west-1": ["opensearch-3.8.0", "opensearch-2.19.6", "opensearch-2.6.0-mt", "opensearch-2.6.0", "elasticsearch-7.10.2", "elasticsearch-7.2.0"],
+        "aws-us-east-1": ["opensearch-3.8.0", "opensearch-2.19.6", "opensearch-2.6.0-mt", "opensearch-2.6.0", "elasticsearch-7.10.2", "elasticsearch-7.2.0"],
+        "aws-us-west-2": ["opensearch-3.8.0", "opensearch-2.19.6", "opensearch-2.19.3", "opensearch-2.19.2", "opensearch-2.6.0-mt", "opensearch-2.6.0", "elasticsearch-7.10.2", "elasticsearch-7.2.0"],
+        "gcp-us-east4": ["opensearch-3.8.0", "opensearch-2.19.6", "opensearch-2.19.3", "opensearch-2.6.0", "elasticsearch-7.10.2", "elasticsearch-7.2.0"]
+      },
+      "max_credentials": 100,
+      "limit_docs": null,
+      "limit_shards": null,
+      "limit_bytes": 354000000000,
+      "limit_bandwidth": 25000000000
+    },
+    {
+      "id": "business-lg-esplat",
+      "name": "Business Large",
+      "price_in_cents": 78000,
+      "billing_interval_months": 1,
+      "single_tenant": true,
+      "private_network": true,
+      "tier": "business",
+      "dedicated": false,
+      "releases": ["elasticsearch-9.4.1", "elasticsearch-8.17.5"],
+      "offers": {
+        "aws-ap-southeast-2": ["elasticsearch-8.17.5"],
+        "aws-eu-central-1": ["elasticsearch-8.17.5"],
+        "aws-eu-west-1": ["elasticsearch-8.17.5"],
+        "aws-us-east-1": ["elasticsearch-8.17.5"],
+        "aws-us-west-2": ["elasticsearch-8.17.5"],
+        "gcp-us-east4": ["elasticsearch-9.4.1", "elasticsearch-8.17.5"]
+      },
+      "max_credentials": 100,
+      "limit_docs": null,
+      "limit_shards": null,
+      "limit_bytes": 354000000000,
+      "limit_bandwidth": 25000000000
+    },
+    {
+      "id": "business-memory-2x",
+      "name": "Business Memory 2X",
+      "price_in_cents": 295000,
+      "billing_interval_months": 1,
+      "single_tenant": true,
+      "private_network": true,
+      "tier": "business",
+      "dedicated": false,
+      "releases": ["opensearch-3.8.0", "opensearch-2.19.6", "opensearch-2.19.3", "opensearch-2.19.2", "opensearch-2.6.0-mt", "opensearch-2.6.0", "elasticsearch-7.10.2", "elasticsearch-7.2.0"],
+      "offers": {
+        "aws-ap-southeast-2": ["opensearch-3.8.0", "opensearch-2.19.6", "opensearch-2.6.0-mt", "opensearch-2.6.0", "elasticsearch-7.10.2", "elasticsearch-7.2.0"],
+        "aws-eu-central-1": ["opensearch-3.8.0", "opensearch-2.19.6", "opensearch-2.6.0-mt", "opensearch-2.6.0", "elasticsearch-7.10.2", "elasticsearch-7.2.0"],
+        "aws-eu-west-1": ["opensearch-3.8.0", "opensearch-2.19.6", "opensearch-2.6.0-mt", "opensearch-2.6.0", "elasticsearch-7.10.2", "elasticsearch-7.2.0"],
+        "aws-us-east-1": ["opensearch-3.8.0", "opensearch-2.19.6", "opensearch-2.6.0-mt", "opensearch-2.6.0", "elasticsearch-7.10.2", "elasticsearch-7.2.0"],
+        "aws-us-west-2": ["opensearch-3.8.0", "opensearch-2.19.6", "opensearch-2.19.3", "opensearch-2.19.2", "opensearch-2.6.0-mt", "opensearch-2.6.0", "elasticsearch-7.10.2", "elasticsearch-7.2.0"],
+        "gcp-us-east4": ["opensearch-3.8.0", "opensearch-2.19.6", "opensearch-2.19.3", "opensearch-2.6.0", "elasticsearch-7.10.2", "elasticsearch-7.2.0"]
+      },
+      "max_credentials": 100,
+      "limit_docs": null,
+      "limit_shards": null,
+      "limit_bytes": 1526860873728,
+      "limit_bandwidth": 100000000000
+    },
+    {
+      "id": "business-performance-2x",
+      "name": "Business Performance 2X",
+      "price_in_cents": 170000,
+      "billing_interval_months": 1,
+      "single_tenant": true,
+      "private_network": true,
+      "tier": "business",
+      "dedicated": false,
+      "releases": ["opensearch-3.8.0", "opensearch-2.19.6", "opensearch-2.19.3", "opensearch-2.19.2", "opensearch-2.6.0-mt", "opensearch-2.6.0", "elasticsearch-7.10.2", "elasticsearch-7.2.0"],
+      "offers": {
+        "aws-ap-southeast-2": ["opensearch-3.8.0", "opensearch-2.19.6", "opensearch-2.6.0-mt", "opensearch-2.6.0", "elasticsearch-7.10.2", "elasticsearch-7.2.0"],
+        "aws-eu-central-1": ["opensearch-3.8.0", "opensearch-2.19.6", "opensearch-2.6.0-mt", "opensearch-2.6.0", "elasticsearch-7.10.2", "elasticsearch-7.2.0"],
+        "aws-eu-west-1": ["opensearch-3.8.0", "opensearch-2.19.6", "opensearch-2.6.0-mt", "opensearch-2.6.0", "elasticsearch-7.10.2", "elasticsearch-7.2.0"],
+        "aws-us-east-1": ["opensearch-3.8.0", "opensearch-2.19.6", "opensearch-2.6.0-mt", "opensearch-2.6.0", "elasticsearch-7.10.2", "elasticsearch-7.2.0"],
+        "aws-us-west-2": ["opensearch-3.8.0", "opensearch-2.19.6", "opensearch-2.19.3", "opensearch-2.19.2", "opensearch-2.6.0-mt", "opensearch-2.6.0", "elasticsearch-7.10.2", "elasticsearch-7.2.0"],
+        "gcp-us-east4": ["opensearch-3.8.0", "opensearch-2.19.6", "opensearch-2.19.3", "opensearch-2.6.0", "elasticsearch-7.10.2", "elasticsearch-7.2.0"]
+      },
+      "max_credentials": 100,
+      "limit_docs": null,
+      "limit_shards": null,
+      "limit_bytes": 1422000000000,
+      "limit_bandwidth": 100000000000
+    },
+    {
+      "id": "business-performance-2x-esplat",
+      "name": "Business Performance 2X",
+      "price_in_cents": 204000,
+      "billing_interval_months": 1,
+      "single_tenant": true,
+      "private_network": true,
+      "tier": "business",
+      "dedicated": false,
+      "releases": ["elasticsearch-9.4.1", "elasticsearch-8.17.5"],
+      "offers": {
+        "aws-ap-southeast-2": ["elasticsearch-8.17.5"],
+        "aws-eu-central-1": ["elasticsearch-8.17.5"],
+        "aws-eu-west-1": ["elasticsearch-8.17.5"],
+        "aws-us-east-1": ["elasticsearch-8.17.5"],
+        "aws-us-west-2": ["elasticsearch-8.17.5"],
+        "gcp-us-east4": ["elasticsearch-9.4.1", "elasticsearch-8.17.5"]
+      },
+      "max_credentials": 100,
+      "limit_docs": null,
+      "limit_shards": null,
+      "limit_bytes": 1422000000000,
+      "limit_bandwidth": 100000000000
+    },
+    {
+      "id": "business-performance-4x",
+      "name": "Business Performance 4X",
+      "price_in_cents": 340000,
+      "billing_interval_months": 1,
+      "single_tenant": true,
+      "private_network": true,
+      "tier": "business",
+      "dedicated": false,
+      "releases": ["opensearch-3.8.0", "opensearch-2.19.6", "opensearch-2.19.3", "opensearch-2.19.2", "opensearch-2.6.0-mt", "opensearch-2.6.0", "elasticsearch-7.10.2", "elasticsearch-7.2.0"],
+      "offers": {
+        "aws-ap-southeast-2": ["opensearch-3.8.0", "opensearch-2.19.6", "opensearch-2.6.0-mt", "opensearch-2.6.0", "elasticsearch-7.10.2", "elasticsearch-7.2.0"],
+        "aws-eu-central-1": ["opensearch-3.8.0", "opensearch-2.19.6", "opensearch-2.6.0-mt", "opensearch-2.6.0", "elasticsearch-7.10.2", "elasticsearch-7.2.0"],
+        "aws-eu-west-1": ["opensearch-3.8.0", "opensearch-2.19.6", "opensearch-2.6.0-mt", "opensearch-2.6.0", "elasticsearch-7.10.2", "elasticsearch-7.2.0"],
+        "aws-us-east-1": ["opensearch-3.8.0", "opensearch-2.19.6", "opensearch-2.6.0-mt", "opensearch-2.6.0", "elasticsearch-7.10.2", "elasticsearch-7.2.0"],
+        "aws-us-west-2": ["opensearch-3.8.0", "opensearch-2.19.6", "opensearch-2.19.3", "opensearch-2.19.2", "opensearch-2.6.0-mt", "opensearch-2.6.0", "elasticsearch-7.10.2", "elasticsearch-7.2.0"],
+        "gcp-us-east4": ["opensearch-3.8.0", "opensearch-2.19.6", "opensearch-2.19.3", "opensearch-2.6.0", "elasticsearch-7.10.2", "elasticsearch-7.2.0"]
+      },
+      "max_credentials": 100,
+      "limit_docs": null,
+      "limit_shards": null,
+      "limit_bytes": 2850000000000,
+      "limit_bandwidth": null
+    },
+    {
+      "id": "business-performance-4x-esplat",
+      "name": "Business Performance 4X",
+      "price_in_cents": 408000,
+      "billing_interval_months": 1,
+      "single_tenant": true,
+      "private_network": true,
+      "tier": "business",
+      "dedicated": false,
+      "releases": ["elasticsearch-9.4.1", "elasticsearch-8.17.5"],
+      "offers": {
+        "aws-ap-southeast-2": ["elasticsearch-8.17.5"],
+        "aws-eu-central-1": ["elasticsearch-8.17.5"],
+        "aws-eu-west-1": ["elasticsearch-8.17.5"],
+        "aws-us-east-1": ["elasticsearch-8.17.5"],
+        "aws-us-west-2": ["elasticsearch-8.17.5"],
+        "gcp-us-east4": ["elasticsearch-9.4.1", "elasticsearch-8.17.5"]
+      },
+      "max_credentials": 100,
+      "limit_docs": null,
+      "limit_shards": null,
+      "limit_bytes": 2850000000000,
+      "limit_bandwidth": null
+    },
+    {
+      "id": "business-performance-8x",
+      "name": "Business Performance 8X",
+      "price_in_cents": 680000,
+      "billing_interval_months": 1,
+      "single_tenant": true,
+      "private_network": true,
+      "tier": "business",
+      "dedicated": false,
+      "releases": ["opensearch-3.8.0", "opensearch-2.19.6", "opensearch-2.19.3", "opensearch-2.19.2", "opensearch-2.6.0-mt", "opensearch-2.6.0", "elasticsearch-7.10.2", "elasticsearch-7.2.0"],
+      "offers": {
+        "aws-ap-southeast-2": ["opensearch-3.8.0", "opensearch-2.19.6", "opensearch-2.6.0-mt", "opensearch-2.6.0", "elasticsearch-7.10.2", "elasticsearch-7.2.0"],
+        "aws-eu-central-1": ["opensearch-3.8.0", "opensearch-2.19.6", "opensearch-2.6.0-mt", "opensearch-2.6.0", "elasticsearch-7.10.2", "elasticsearch-7.2.0"],
+        "aws-eu-west-1": ["opensearch-3.8.0", "opensearch-2.19.6", "opensearch-2.6.0-mt", "opensearch-2.6.0", "elasticsearch-7.10.2", "elasticsearch-7.2.0"],
+        "aws-us-east-1": ["opensearch-3.8.0", "opensearch-2.19.6", "opensearch-2.6.0-mt", "opensearch-2.6.0", "elasticsearch-7.10.2", "elasticsearch-7.2.0"],
+        "aws-us-west-2": ["opensearch-3.8.0", "opensearch-2.19.6", "opensearch-2.19.3", "opensearch-2.19.2", "opensearch-2.6.0-mt", "opensearch-2.6.0", "elasticsearch-7.10.2", "elasticsearch-7.2.0"],
+        "gcp-us-east4": ["opensearch-3.8.0", "opensearch-2.19.6", "opensearch-2.19.3", "opensearch-2.6.0", "elasticsearch-7.10.2", "elasticsearch-7.2.0"]
+      },
+      "max_credentials": 100,
+      "limit_docs": null,
+      "limit_shards": null,
+      "limit_bytes": 5700000000000,
+      "limit_bandwidth": null
+    },
+    {
+      "id": "business-performance-8x-esplat",
+      "name": "Business Performance 8X",
+      "price_in_cents": 816000,
+      "billing_interval_months": 1,
+      "single_tenant": true,
+      "private_network": true,
+      "tier": "business",
+      "dedicated": false,
+      "releases": ["elasticsearch-9.4.1", "elasticsearch-8.17.5"],
+      "offers": {
+        "aws-ap-southeast-2": ["elasticsearch-8.17.5"],
+        "aws-eu-central-1": ["elasticsearch-8.17.5"],
+        "aws-eu-west-1": ["elasticsearch-8.17.5"],
+        "aws-us-east-1": ["elasticsearch-8.17.5"],
+        "aws-us-west-2": ["elasticsearch-8.17.5"],
+        "gcp-us-east4": ["elasticsearch-9.4.1", "elasticsearch-8.17.5"]
+      },
+      "max_credentials": 100,
+      "limit_docs": null,
+      "limit_shards": null,
+      "limit_bytes": 5700000000000,
+      "limit_bandwidth": null
+    },
+    {
+      "id": "business-performance-lg",
+      "name": "Business Performance Large",
+      "price_in_cents": 60000,
+      "billing_interval_months": 1,
+      "single_tenant": true,
+      "private_network": true,
+      "tier": "business",
+      "dedicated": false,
+      "releases": ["opensearch-3.8.0", "opensearch-2.19.6", "opensearch-2.19.3", "opensearch-2.19.2", "opensearch-2.6.0-mt", "opensearch-2.6.0", "elasticsearch-7.10.2", "elasticsearch-7.2.0"],
+      "offers": {
+        "aws-ap-southeast-2": ["opensearch-3.8.0", "opensearch-2.19.6", "opensearch-2.6.0-mt", "opensearch-2.6.0", "elasticsearch-7.10.2", "elasticsearch-7.2.0"],
+        "aws-eu-central-1": ["opensearch-3.8.0", "opensearch-2.19.6", "opensearch-2.6.0-mt", "opensearch-2.6.0", "elasticsearch-7.10.2", "elasticsearch-7.2.0"],
+        "aws-eu-west-1": ["opensearch-3.8.0", "opensearch-2.19.6", "opensearch-2.6.0-mt", "opensearch-2.6.0", "elasticsearch-7.10.2", "elasticsearch-7.2.0"],
+        "aws-us-east-1": ["opensearch-3.8.0", "opensearch-2.19.6", "opensearch-2.6.0-mt", "opensearch-2.6.0", "elasticsearch-7.10.2", "elasticsearch-7.2.0"],
+        "aws-us-west-2": ["opensearch-3.8.0", "opensearch-2.19.6", "opensearch-2.19.3", "opensearch-2.19.2", "opensearch-2.6.0-mt", "opensearch-2.6.0", "elasticsearch-7.10.2", "elasticsearch-7.2.0"],
+        "gcp-us-east4": ["opensearch-3.8.0", "opensearch-2.19.6", "opensearch-2.19.3", "opensearch-2.6.0", "elasticsearch-7.10.2", "elasticsearch-7.2.0"]
+      },
+      "max_credentials": 100,
+      "limit_docs": null,
+      "limit_shards": null,
+      "limit_bytes": 354000000000,
+      "limit_bandwidth": 25000000000
+    },
+    {
+      "id": "business-performance-lg-esplat",
+      "name": "Business Performance Large",
+      "price_in_cents": 72000,
+      "billing_interval_months": 1,
+      "single_tenant": true,
+      "private_network": true,
+      "tier": "business",
+      "dedicated": false,
+      "releases": ["elasticsearch-9.4.1", "elasticsearch-8.17.5"],
+      "offers": {
+        "aws-ap-southeast-2": ["elasticsearch-8.17.5"],
+        "aws-eu-central-1": ["elasticsearch-8.17.5"],
+        "aws-eu-west-1": ["elasticsearch-8.17.5"],
+        "aws-us-east-1": ["elasticsearch-8.17.5"],
+        "aws-us-west-2": ["elasticsearch-8.17.5"],
+        "gcp-us-east4": ["elasticsearch-9.4.1", "elasticsearch-8.17.5"]
+      },
+      "max_credentials": 100,
+      "limit_docs": null,
+      "limit_shards": null,
+      "limit_bytes": 354000000000,
+      "limit_bandwidth": 25000000000
+    },
+    {
+      "id": "business-performance-xl",
+      "name": "Business Performance XL",
+      "price_in_cents": 85000,
+      "billing_interval_months": 1,
+      "single_tenant": true,
+      "private_network": true,
+      "tier": "business",
+      "dedicated": false,
+      "releases": ["opensearch-3.8.0", "opensearch-2.19.6", "opensearch-2.19.3", "opensearch-2.19.2", "opensearch-2.6.0-mt", "opensearch-2.6.0", "elasticsearch-7.10.2", "elasticsearch-7.2.0"],
+      "offers": {
+        "aws-ap-southeast-2": ["opensearch-3.8.0", "opensearch-2.19.6", "opensearch-2.6.0-mt", "opensearch-2.6.0", "elasticsearch-7.10.2", "elasticsearch-7.2.0"],
+        "aws-eu-central-1": ["opensearch-3.8.0", "opensearch-2.19.6", "opensearch-2.6.0-mt", "opensearch-2.6.0", "elasticsearch-7.10.2", "elasticsearch-7.2.0"],
+        "aws-eu-west-1": ["opensearch-3.8.0", "opensearch-2.19.6", "opensearch-2.6.0-mt", "opensearch-2.6.0", "elasticsearch-7.10.2", "elasticsearch-7.2.0"],
+        "aws-us-east-1": ["opensearch-3.8.0", "opensearch-2.19.6", "opensearch-2.6.0-mt", "opensearch-2.6.0", "elasticsearch-7.10.2", "elasticsearch-7.2.0"],
+        "aws-us-west-2": ["opensearch-3.8.0", "opensearch-2.19.6", "opensearch-2.19.3", "opensearch-2.19.2", "opensearch-2.6.0-mt", "opensearch-2.6.0", "elasticsearch-7.10.2", "elasticsearch-7.2.0"],
+        "gcp-us-east4": ["opensearch-3.8.0", "opensearch-2.19.6", "opensearch-2.19.3", "opensearch-2.6.0", "elasticsearch-7.10.2", "elasticsearch-7.2.0"]
+      },
+      "max_credentials": 100,
+      "limit_docs": null,
+      "limit_shards": null,
+      "limit_bytes": 450000000000,
+      "limit_bandwidth": 50000000000
+    },
+    {
+      "id": "business-performance-xl-esplat",
+      "name": "Business Performance XL",
+      "price_in_cents": 102000,
+      "billing_interval_months": 1,
+      "single_tenant": true,
+      "private_network": true,
+      "tier": "business",
+      "dedicated": false,
+      "releases": ["elasticsearch-9.4.1", "elasticsearch-8.17.5"],
+      "offers": {
+        "aws-ap-southeast-2": ["elasticsearch-8.17.5"],
+        "aws-eu-central-1": ["elasticsearch-8.17.5"],
+        "aws-eu-west-1": ["elasticsearch-8.17.5"],
+        "aws-us-east-1": ["elasticsearch-8.17.5"],
+        "aws-us-west-2": ["elasticsearch-8.17.5"],
+        "gcp-us-east4": ["elasticsearch-9.4.1", "elasticsearch-8.17.5"]
+      },
+      "max_credentials": 100,
+      "limit_docs": null,
+      "limit_shards": null,
+      "limit_bytes": 450000000000,
+      "limit_bandwidth": 50000000000
+    },
+    {
+      "id": "business-xl",
+      "name": "Business XL",
+      "price_in_cents": 130000,
+      "billing_interval_months": 1,
+      "single_tenant": true,
+      "private_network": true,
+      "tier": "business",
+      "dedicated": false,
+      "releases": ["opensearch-3.8.0", "opensearch-2.19.6", "opensearch-2.19.3", "opensearch-2.19.2", "opensearch-2.6.0-mt", "opensearch-2.6.0", "elasticsearch-7.10.2", "elasticsearch-7.2.0"],
+      "offers": {
+        "aws-ap-southeast-2": ["opensearch-3.8.0", "opensearch-2.19.6", "opensearch-2.6.0-mt", "opensearch-2.6.0", "elasticsearch-7.10.2", "elasticsearch-7.2.0"],
+        "aws-eu-central-1": ["opensearch-3.8.0", "opensearch-2.19.6", "opensearch-2.6.0-mt", "opensearch-2.6.0", "elasticsearch-7.10.2", "elasticsearch-7.2.0"],
+        "aws-eu-west-1": ["opensearch-3.8.0", "opensearch-2.19.6", "opensearch-2.6.0-mt", "opensearch-2.6.0", "elasticsearch-7.10.2", "elasticsearch-7.2.0"],
+        "aws-us-east-1": ["opensearch-3.8.0", "opensearch-2.19.6", "opensearch-2.6.0-mt", "opensearch-2.6.0", "elasticsearch-7.10.2", "elasticsearch-7.2.0"],
+        "aws-us-west-2": ["opensearch-3.8.0", "opensearch-2.19.6", "opensearch-2.19.3", "opensearch-2.19.2", "opensearch-2.6.0-mt", "opensearch-2.6.0", "elasticsearch-7.10.2", "elasticsearch-7.2.0"],
+        "gcp-us-east4": ["opensearch-3.8.0", "opensearch-2.19.6", "opensearch-2.19.3", "opensearch-2.6.0", "elasticsearch-7.10.2", "elasticsearch-7.2.0"]
+      },
+      "max_credentials": 100,
+      "limit_docs": null,
+      "limit_shards": null,
+      "limit_bytes": 711000000000,
+      "limit_bandwidth": 50000000000
+    },
+    {
+      "id": "business-xl-esplat",
+      "name": "Business XL",
+      "price_in_cents": 156000,
+      "billing_interval_months": 1,
+      "single_tenant": true,
+      "private_network": true,
+      "tier": "business",
+      "dedicated": false,
+      "releases": ["elasticsearch-9.4.1", "elasticsearch-8.17.5"],
+      "offers": {
+        "aws-ap-southeast-2": ["elasticsearch-8.17.5"],
+        "aws-eu-central-1": ["elasticsearch-8.17.5"],
+        "aws-eu-west-1": ["elasticsearch-8.17.5"],
+        "aws-us-east-1": ["elasticsearch-8.17.5"],
+        "aws-us-west-2": ["elasticsearch-8.17.5"],
+        "gcp-us-east4": ["elasticsearch-9.4.1", "elasticsearch-8.17.5"]
+      },
+      "max_credentials": 100,
+      "limit_docs": null,
+      "limit_shards": null,
+      "limit_bytes": 711000000000,
+      "limit_bandwidth": 50000000000
+    },
+    {
+      "id": "sandbox",
+      "name": "Sandbox",
+      "price_in_cents": 0,
+      "billing_interval_months": 1,
+      "single_tenant": false,
+      "private_network": false,
+      "tier": "hobby",
+      "dedicated": false,
+      "releases": ["opensearch-3.8.0"],
+      "offers": {
+        "aws-us-east-1": ["opensearch-3.8.0"]
+      },
+      "max_credentials": 1,
+      "limit_docs": 35000,
+      "limit_shards": 10,
+      "limit_bytes": 125000000,
+      "limit_bandwidth": 166666667
+    },
+    {
+      "id": "staging",
+      "name": "Staging",
+      "price_in_cents": 1500,
+      "billing_interval_months": 1,
+      "single_tenant": false,
+      "private_network": false,
+      "tier": "hobby",
+      "dedicated": false,
+      "releases": ["opensearch-3.8.0"],
+      "offers": {
+        "aws-us-east-1": ["opensearch-3.8.0"]
+      },
+      "max_credentials": 1,
+      "limit_docs": 100000,
+      "limit_shards": 10,
+      "limit_bytes": 1000000000,
+      "limit_bandwidth": 666666667
+    },
+    {
+      "id": "standard-birch",
+      "name": "Standard Birch",
+      "price_in_cents": 9000,
+      "billing_interval_months": 1,
+      "single_tenant": false,
+      "private_network": false,
+      "tier": "standard",
+      "dedicated": false,
+      "releases": ["opensearch-3.8.0", "opensearch-2.19.6", "elasticsearch-7.10.2"],
+      "offers": {
+        "aws-ap-southeast-2": ["opensearch-3.8.0", "elasticsearch-7.10.2"],
+        "aws-eu-central-1": ["opensearch-3.8.0", "elasticsearch-7.10.2"],
+        "aws-eu-west-1": ["opensearch-3.8.0", "opensearch-2.19.6", "elasticsearch-7.10.2"],
+        "aws-us-east-1": ["opensearch-3.8.0", "opensearch-2.19.6", "elasticsearch-7.10.2"],
+        "aws-us-west-2": ["opensearch-3.8.0", "elasticsearch-7.10.2"]
+      },
+      "max_credentials": 10,
+      "limit_docs": 15000000,
+      "limit_shards": 45,
+      "limit_bytes": 25000000000,
+      "limit_bandwidth": 3333333333
+    },
+    {
+      "id": "standard-cork",
+      "name": "Standard Cork",
+      "price_in_cents": 15000,
+      "billing_interval_months": 1,
+      "single_tenant": false,
+      "private_network": false,
+      "tier": "standard",
+      "dedicated": false,
+      "releases": ["opensearch-3.8.0", "opensearch-2.19.6", "elasticsearch-7.10.2"],
+      "offers": {
+        "aws-ap-southeast-2": ["opensearch-3.8.0", "elasticsearch-7.10.2"],
+        "aws-eu-central-1": ["opensearch-3.8.0", "elasticsearch-7.10.2"],
+        "aws-eu-west-1": ["opensearch-3.8.0", "opensearch-2.19.6", "elasticsearch-7.10.2"],
+        "aws-us-east-1": ["opensearch-3.8.0", "opensearch-2.19.6", "elasticsearch-7.10.2"],
+        "aws-us-west-2": ["opensearch-3.8.0", "elasticsearch-7.10.2"]
+      },
+      "max_credentials": 10,
+      "limit_docs": 30000000,
+      "limit_shards": 60,
+      "limit_bytes": 40000000000,
+      "limit_bandwidth": 4166666667
+    },
+    {
+      "id": "standard-elm",
+      "name": "Standard Elm",
+      "price_in_cents": 5000,
+      "billing_interval_months": 1,
+      "single_tenant": false,
+      "private_network": false,
+      "tier": "standard",
+      "dedicated": false,
+      "releases": ["opensearch-3.8.0", "opensearch-2.19.6", "elasticsearch-7.10.2"],
+      "offers": {
+        "aws-ap-southeast-2": ["opensearch-3.8.0", "elasticsearch-7.10.2"],
+        "aws-eu-central-1": ["opensearch-3.8.0", "elasticsearch-7.10.2"],
+        "aws-eu-west-1": ["opensearch-3.8.0", "opensearch-2.19.6", "elasticsearch-7.10.2"],
+        "aws-us-east-1": ["opensearch-3.8.0", "opensearch-2.19.6", "elasticsearch-7.10.2"],
+        "aws-us-west-2": ["opensearch-3.8.0", "elasticsearch-7.10.2"]
+      },
+      "max_credentials": 10,
+      "limit_docs": 5000000,
+      "limit_shards": 40,
+      "limit_bytes": 10000000000,
+      "limit_bandwidth": 2500000000
+    },
+    {
+      "id": "standard-fir",
+      "name": "Standard Fir",
+      "price_in_cents": 2000,
+      "billing_interval_months": 1,
+      "single_tenant": false,
+      "private_network": false,
+      "tier": "standard",
+      "dedicated": false,
+      "releases": ["opensearch-3.8.0", "opensearch-2.19.6", "elasticsearch-7.10.2"],
+      "offers": {
+        "aws-ap-southeast-2": ["opensearch-3.8.0", "elasticsearch-7.10.2"],
+        "aws-eu-central-1": ["opensearch-3.8.0", "elasticsearch-7.10.2"],
+        "aws-eu-west-1": ["opensearch-3.8.0", "opensearch-2.19.6", "elasticsearch-7.10.2"],
+        "aws-us-east-1": ["opensearch-3.8.0", "opensearch-2.19.6", "elasticsearch-7.10.2"],
+        "aws-us-west-2": ["opensearch-3.8.0", "elasticsearch-7.10.2"]
+      },
+      "max_credentials": 10,
+      "limit_docs": 500000,
+      "limit_shards": 10,
+      "limit_bytes": 1000000000,
+      "limit_bandwidth": 1666666667
+    },
+    {
+      "id": "standard-oak",
+      "name": "Standard Oak",
+      "price_in_cents": 40000,
+      "billing_interval_months": 1,
+      "single_tenant": false,
+      "private_network": false,
+      "tier": "standard",
+      "dedicated": false,
+      "releases": ["opensearch-3.8.0", "opensearch-2.19.6", "elasticsearch-7.10.2"],
+      "offers": {
+        "aws-ap-southeast-2": ["opensearch-3.8.0", "elasticsearch-7.10.2"],
+        "aws-eu-central-1": ["opensearch-3.8.0", "elasticsearch-7.10.2"],
+        "aws-eu-west-1": ["opensearch-3.8.0", "opensearch-2.19.6", "elasticsearch-7.10.2"],
+        "aws-us-east-1": ["opensearch-3.8.0", "opensearch-2.19.6", "elasticsearch-7.10.2"],
+        "aws-us-west-2": ["opensearch-3.8.0", "elasticsearch-7.10.2"]
+      },
+      "max_credentials": 10,
+      "limit_docs": 50000000,
+      "limit_shards": 100,
+      "limit_bytes": 100000000000,
+      "limit_bandwidth": 6666666667
+    },
+    {
+      "id": "standard-teak",
+      "name": "Standard Teak",
+      "price_in_cents": 25000,
+      "billing_interval_months": 1,
+      "single_tenant": false,
+      "private_network": false,
+      "tier": "standard",
+      "dedicated": false,
+      "releases": ["opensearch-3.8.0", "opensearch-2.19.6", "elasticsearch-7.10.2"],
+      "offers": {
+        "aws-ap-southeast-2": ["opensearch-3.8.0", "elasticsearch-7.10.2"],
+        "aws-eu-central-1": ["opensearch-3.8.0", "elasticsearch-7.10.2"],
+        "aws-eu-west-1": ["opensearch-3.8.0", "opensearch-2.19.6", "elasticsearch-7.10.2"],
+        "aws-us-east-1": ["opensearch-3.8.0", "opensearch-2.19.6", "elasticsearch-7.10.2"],
+        "aws-us-west-2": ["opensearch-3.8.0", "elasticsearch-7.10.2"]
+      },
+      "max_credentials": 10,
+      "limit_docs": 40000000,
+      "limit_shards": 80,
+      "limit_bytes": 70000000000,
+      "limit_bandwidth": 5000000000
+    }
+  ],
+  "spaces": [
+    {
+      "id": "acme-private-use1",
+      "account_id": "acme",
+      "name": "Acme private (us-east-1)",
+      "region": "aws-us-east-1",
+      "private_network": true
+    }
+  ]
+}
