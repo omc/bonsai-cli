@@ -49,6 +49,9 @@ jobs:
     runs-on: ${{ matrix.os }}
     env:
       BONSAI_KEYRING: "off"
+      # Line numbers are all a failing test's backtrace needs; full debuginfo slows
+      # every link and grows the cache.
+      CARGO_PROFILE_DEV_DEBUG: line-tables-only
     steps:
       - uses: actions/checkout@v6
       - uses: dtolnay/rust-toolchain@stable
