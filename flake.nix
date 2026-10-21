@@ -48,5 +48,17 @@
           };
         };
       });
+
+      # CI builds this instead of the package: it proves the flake builds without
+      # the release profile's fat LTO and single codegen unit, which take most of
+      # the build and are checked by the musl job.
+      checks = forAllSystems (pkgs: {
+        build = self.packages.${pkgs.stdenv.hostPlatform.system}.default.overrideAttrs (old: {
+          env = (old.env or { }) // {
+            CARGO_PROFILE_RELEASE_LTO = "false";
+            CARGO_PROFILE_RELEASE_CODEGEN_UNITS = "16";
+          };
+        });
+      });
     };
 }
