@@ -41,6 +41,7 @@ jobs:
       - run: cargo clippy --workspace --all-targets -- -D warnings
 
   test:
+    needs: [fmt, clippy, deny]
     strategy:
       fail-fast: false
       matrix:
@@ -68,6 +69,7 @@ jobs:
   # The release builds static musl binaries (dist-workspace.toml); build them on
   # every PR too, so an aws-lc-rs or musl link problem shows before a tag.
   musl:
+    needs: [fmt, clippy, deny]
     strategy:
       fail-fast: false
       matrix:
