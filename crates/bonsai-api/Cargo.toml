@@ -1,0 +1,29 @@
+[package]
+name = "bonsai-api"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+license.workspace = true
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+jiff.workspace = true
+thiserror.workspace = true
+reqwest.workspace = true
+tokio.workspace = true
+secrecy.workspace = true
+uuid.workspace = true
+tracing.workspace = true
+url.workspace = true
+rand.workspace = true
+rustls.workspace = true
+
+[dev-dependencies]
+bonsai-contract = { path = "../bonsai-contract" }
+wiremock.workspace = true
+tokio = { workspace = true, features = ["macros", "rt-multi-thread", "net", "io-util"] }
+tokio-rustls.workspace = true
+tracing-subscriber.workspace = true
+tempfile.workspace = true
