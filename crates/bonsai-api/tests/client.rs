@@ -138,6 +138,7 @@ impl<S: tracing::Subscriber> tracing_subscriber::Layer<S> for AttemptLayer {
 
 /// An HTTPS server on 127.0.0.1 whose certificate is signed by `fixtures/test-ca.pem`.
 /// It answers every request with `account_json()`, and counts the connections it accepts.
+/// The leaf expires 2028-12-29; macOS rejects TLS leaves valid for more than 825 days.
 async fn tls_server() -> (String, Arc<AtomicUsize>) {
     use rustls::pki_types::pem::PemObject;
     use rustls::pki_types::{CertificateDer, PrivateKeyDer};
