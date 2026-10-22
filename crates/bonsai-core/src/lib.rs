@@ -55,8 +55,6 @@ pub enum CoreError {
     Usage(String),
     #[error("no rw credential on {0}")]
     NoCredential(String),
-    #[error("{cluster} has several credentials: {}", .ids.join(", "))]
-    SeveralCredentials { cluster: String, ids: Vec<String> },
     #[error("the login was denied in the browser")]
     LoginDenied,
     #[error("the login expired before it was approved; run `bonsai login` again")]

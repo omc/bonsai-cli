@@ -1,6 +1,6 @@
 //! `bonsai url`: the connection URL, with its password.
 
-use bonsai_api::{AccessType, Client, collect_pages};
+use bonsai_api::{Client, collect_pages};
 use secrecy::SecretString;
 
 use crate::CoreError;
@@ -20,21 +20,12 @@ pub async fn connection_url(
                     .await
             })
             .await?;
-            let mut rw: Vec<String> = all
-                .into_iter()
-                .filter(|c| c.access_type == AccessType::Rw)
+            // The one the dashboard shows; a cluster has one while it has an rw
+            // credential.
+            all.into_iter()
+                .find(|c| c.default)
                 .map(|c| c.id)
-                .collect();
-            match rw.len() {
-                0 => return Err(CoreError::NoCredential(cluster_id.to_owned())),
-                1 => rw.remove(0),
-                _ => {
-                    return Err(CoreError::SeveralCredentials {
-                        cluster: cluster_id.to_owned(),
-                        ids: rw,
-                    });
-                }
-            }
+                .ok_or_else(|| CoreError::NoCredential(cluster_id.to_owned()))?
         }
     };
     let cred = api.get_cluster_credential(cluster_id, &id).await?;

@@ -2,14 +2,12 @@
 //! command that prints a secret.
 
 use anyhow::Result;
-use bonsai_api::{Client, collect_pages};
 use bonsai_core::{CoreError, connection_url};
 use secrecy::{ExposeSecret, SecretString};
 
 use super::Ctx;
-use super::cluster::{prompt_error, resolve};
+use super::cluster::resolve;
 use crate::cli::UrlArgs;
-use crate::sanitize::sanitize;
 
 pub async fn url(ctx: &Ctx, args: UrlArgs) -> Result<()> {
     if let Some(name) = &args.env
@@ -23,19 +21,9 @@ pub async fn url(ctx: &Ctx, args: UrlArgs) -> Result<()> {
     let a = ctx.authed().await?;
     let cluster = resolve(ctx, &a.client, &args.cluster.cluster).await?.value;
     let credential = args.credential.as_deref();
-    let found = ctx
-        .abortable(async { Ok(connection_url(&a.client, &cluster.id, credential).await) })
+    let url = ctx
+        .abortable(async { Ok(connection_url(&a.client, &cluster.id, credential).await?) })
         .await?;
-    let url = match found {
-        Err(CoreError::SeveralCredentials { ids, .. }) if ctx.interactive => {
-            let picked = pick_credential(ctx, &a.client, &cluster.id, &ids).await?;
-            ctx.abortable(async {
-                Ok(connection_url(&a.client, &cluster.id, Some(&picked)).await?)
-            })
-            .await?
-        }
-        other => other?,
-    };
     // Written raw: the URL is the data, and sanitizing it would change it.
     ctx.out.data_line(&line(args.env.as_deref(), &url))
 }
@@ -55,38 +43,6 @@ fn is_env_name(s: &str) -> bool {
         .next()
         .is_some_and(|c| c.is_ascii_alphabetic() || c == '_')
         && chars.all(|c| c.is_ascii_alphanumeric() || c == '_')
-}
-
-/// Asks which of the cluster's credentials `ids` to use, showing name, access type
-/// and ID.
-async fn pick_credential(
-    ctx: &Ctx,
-    client: &Client,
-    cluster_id: &str,
-    ids: &[String],
-) -> Result<String> {
-    let (all, _) = ctx
-        .abortable(async {
-            Ok(collect_pages(None, |cursor| async move {
-                client
-                    .list_cluster_credentials(cluster_id, cursor.as_deref())
-                    .await
-            })
-            .await?)
-        })
-        .await?;
-    let offered: Vec<_> = all.into_iter().filter(|c| ids.contains(&c.id)).collect();
-    let labels: Vec<String> = offered
-        .iter()
-        .map(|c| {
-            let name = c.name.as_deref().unwrap_or("(no name)");
-            sanitize(&format!("{name} ({}, {})", c.access_type, c.id), false).into_owned()
-        })
-        .collect();
-    let picked = inquire::Select::new("Credential", labels)
-        .raw_prompt()
-        .map_err(prompt_error)?;
-    Ok(offered[picked.index].id.clone())
 }
 
 #[cfg(test)]

@@ -519,6 +519,7 @@ fn cluster_json(id: &str, name: &str) -> Value {
         "port": 443,
         "stats": {"docs": null, "shards": null, "bytes": null, "polled_at": null, "limits": null},
         "latest_action": null,
+        "dashboard_url": format!("https://app.bonsai.io/accounts/acme/clusters/{id}"),
         "created_at": "2026-10-20T00:00:00Z",
         "terminated_at": null,
     })
@@ -773,7 +774,7 @@ async fn resize_with_a_caller_key_is_replayed_on_a_rerun() {
 // ---------------------------------------------------------------- url
 
 #[tokio::test]
-async fn connection_url_single_rw() {
+async fn connection_url_uses_the_default_credential() {
     let env = Env::start(0).await;
     let api = env.acme();
     let id = ready_cluster(&api, "connect-me").await;
@@ -797,15 +798,10 @@ async fn connection_url_single_rw() {
         .await
         .unwrap()
         .value;
-    match connection_url(&api, &id, None).await {
-        Err(CoreError::SeveralCredentials { cluster, ids }) => {
-            assert_eq!(cluster, id);
-            assert_eq!(ids.len(), 2);
-            assert!(ids.contains(&second.credential.id));
-        }
-        Err(other) => panic!("expected SeveralCredentials, got {other:?}"),
-        Ok(_) => panic!("expected SeveralCredentials, got a URL"),
-    }
+    // A second rw credential isn't the default: the first still is.
+    assert!(!second.credential.default);
+    let again = connection_url(&api, &id, None).await.unwrap();
+    assert_eq!(again.expose_secret(), url.expose_secret());
     let picked = connection_url(&api, &id, Some(&second.credential.id))
         .await
         .unwrap();
@@ -1214,7 +1210,7 @@ async fn connection_url_without_an_rw_credential() {
         .and(path("/v1/clusters/c1/credentials"))
         .respond_with(ResponseTemplate::new(200).set_body_json(json!({
             "data": [{
-                "id": "cred-ro", "name": "reader", "access_type": "ro",
+                "id": "cred-ro", "name": "reader", "access_type": "ro", "default": false,
                 "allowed_actions": [], "allowed_index_globs": [], "allowed_cidrs": [],
                 "created_at": "2026-10-20T00:00:00Z",
             }],

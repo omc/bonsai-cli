@@ -279,7 +279,8 @@ pub struct ClusterWaitArgs {
 pub struct UrlArgs {
     #[command(flatten)]
     pub cluster: ClusterArg,
-    /// The credential's ID (default: the cluster's only rw credential)
+    /// The credential's ID (default: the cluster's default credential, whose URL the
+    /// dashboard shows)
     #[arg(long, value_name = "ID")]
     pub credential: Option<String>,
     /// Print NAME=<url>, for .env files or eval

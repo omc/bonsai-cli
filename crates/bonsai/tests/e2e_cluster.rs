@@ -524,7 +524,7 @@ fn listed_ids(env: &Env, name: &str) -> String {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn url_with_several_credentials_lists_them_without_prompts() {
+async fn url_prints_the_default_credentials_unless_another_is_named() {
     let env = Env::start().await;
     // Sandbox allows one credential; this plan allows more.
     let id = create(&env, "two-keys", "standard-fir");
@@ -545,18 +545,26 @@ async fn url_with_several_credentials_lists_them_without_prompts() {
         .unwrap();
     assert!(made.status.success(), "{}", stderr(&made));
     let second = stdout_json(&made)["id"].as_str().unwrap().to_owned();
+    let second_url = stdout_json(&made)["url"].as_str().unwrap().to_owned();
+    let shown = env
+        .authed()
+        .args(["api", "GET", &format!("/clusters/{id}/credentials/{first}")])
+        .output()
+        .unwrap();
+    let first_url = stdout_json(&shown)["url"].as_str().unwrap().to_owned();
+    assert_ne!(first_url, second_url);
 
-    let out = env.authed().args(["url", &id]).output().unwrap();
-    let err = stderr(&out);
-    assert_eq!(out.status.code(), Some(2), "{err}");
-    assert!(err.contains(&first) && err.contains(&second), "{err}");
-    assert!(out.stdout.is_empty());
-
+    // The first rw credential stays the default, as the dashboard shows it.
+    env.authed()
+        .args(["url", &id])
+        .assert()
+        .success()
+        .stdout(format!("{first_url}\n"));
     env.authed()
         .args(["url", &id, "--credential", &second])
         .assert()
         .success()
-        .stdout(predicate::str::is_match(r"^https://[^:]+:[^@]+@.+\n$").unwrap());
+        .stdout(format!("{second_url}\n"));
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]

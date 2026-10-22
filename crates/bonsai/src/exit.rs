@@ -79,7 +79,7 @@ impl std::error::Error for TimedOut {}
 ///
 /// | Code | For |
 /// |---|---|
-/// | 2 | usage: [`CoreError::Usage`], `Ambiguous`, `SeveralCredentials`, clap, the config (1) |
+/// | 2 | usage: [`CoreError::Usage`], `Ambiguous`, clap, the config (1) |
 /// | 3 | `401`, `403`, [`NotLoggedIn`], a stored token pointed at another host |
 /// | 4 | `404`, `ClusterNotFound` |
 /// | 5 | an Action that failed with `timed_out`, `action_failed` or an unknown code; [`Failed`] |
@@ -130,9 +130,7 @@ fn code_of(e: &(dyn std::error::Error + 'static)) -> Option<u8> {
 fn core_code(e: &CoreError) -> u8 {
     match e {
         CoreError::Api(api) => api_code(api),
-        CoreError::Usage(_)
-        | CoreError::Ambiguous { .. }
-        | CoreError::SeveralCredentials { .. } => 2,
+        CoreError::Usage(_) | CoreError::Ambiguous { .. } => 2,
         CoreError::ClusterNotFound(_) => 4,
         CoreError::ActionFailed(f) => match (&f.cleanup, &f.code) {
             // Ctrl-C or the timeout cut the check of the cluster short: that
@@ -247,13 +245,6 @@ mod tests {
             core(CoreError::Ambiguous {
                 name: "a".into(),
                 ids: vec!["1".into(), "2".into()]
-            }),
-            2
-        );
-        assert_eq!(
-            core(CoreError::SeveralCredentials {
-                cluster: "c".into(),
-                ids: vec![]
             }),
             2
         );
