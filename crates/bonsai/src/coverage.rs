@@ -5,7 +5,8 @@
 /// `(operationId, commands)`. Each command is a space-separated subcommand path as typed
 /// after `bonsai`. An empty slice means reachable only through `bonsai api`, on purpose.
 pub const COVERAGE: &[(&str, &[&str])] = &[
-    ("getApiRoot", &["doctor", "version"]),
+    // `login` shows the API Tokens page before asking for a token.
+    ("getApiRoot", &["doctor", "version", "login"]),
     ("getAccount", &["login", "whoami", "doctor"]),
     // `login` reads a pasted token's expiry.
     ("getToken", &["login", "whoami"]),

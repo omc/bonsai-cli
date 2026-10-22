@@ -19,10 +19,11 @@ use secrecy::SecretString;
 use serde_json::{Value, json};
 use url::Url;
 
-use super::{Ctx, chain, read_stdin};
+use super::{Ctx, chain, quick_retry, read_stdin};
 use crate::cli::{LoginArgs, LogoutArgs};
 use crate::exit::Interrupted;
 use crate::output::relative_time;
+use crate::sanitize::sanitize;
 
 enum Method {
     Browser,
@@ -60,11 +61,13 @@ pub async fn login(ctx: &Ctx, args: LoginArgs) -> Result<()> {
         Method::Browser => browser_login(ctx, &settings, &args).await?,
         Method::Stdin => {
             if std::io::stdin().is_terminal() {
+                tokens_hint(ctx, &settings).await;
                 ctx.out.notice("Paste the token, then press Ctrl-D");
             }
             (pasted(read_stdin(ctx).await?)?, None)
         }
         Method::Prompt => {
+            tokens_hint(ctx, &settings).await;
             let text = inquire::Password::new("Token")
                 .without_confirmation()
                 .with_display_mode(inquire::PasswordDisplayMode::Masked)
@@ -188,6 +191,20 @@ async fn browser_login(
     }
     let outcome = outcome?;
     Ok((outcome.token, outcome.expires_at))
+}
+
+/// Where a token is made by hand: `GET /v1`'s `tokens_url`. Nothing when the API
+/// can't be reached; the token prompt still works without it.
+async fn tokens_hint(ctx: &Ctx, settings: &Settings) {
+    let Ok(anon) = ctx.client_with(settings, None, quick_retry()) else {
+        return;
+    };
+    if let Ok(root) = anon.get_api_root().await {
+        ctx.out.notice(&format!(
+            "Make a token on the API Tokens page: {}",
+            sanitize(&root.value.tokens_url, false)
+        ));
+    }
 }
 
 fn show_grant(ctx: &Ctx, settings: &Settings, args: &LoginArgs, grant: &CliLoginGrant) {
