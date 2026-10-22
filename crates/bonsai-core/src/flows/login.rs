@@ -2,7 +2,7 @@
 
 use std::time::Duration;
 
-use bonsai_api::{ApiError, CliLoginGrant, CliLoginStart, Client, Ref};
+use bonsai_api::{ApiError, CliLoginGrant, CliLoginStart, Client, ProblemCode, Ref};
 use jiff::Timestamp;
 use secrecy::SecretString;
 use tokio::time::Instant;
@@ -66,10 +66,10 @@ pub async fn device_login(
                 });
             }
             Err(e) => match login_code(&e) {
-                Some("authorization_pending") => {}
-                Some("slow_down") => interval = interval.saturating_add(SLOW_DOWN),
-                Some("access_denied") => return Err(CoreError::LoginDenied),
-                Some("expired_token") => return Err(CoreError::LoginExpired),
+                Some(ProblemCode::AuthorizationPending) => {}
+                Some(ProblemCode::SlowDown) => interval = interval.saturating_add(SLOW_DOWN),
+                Some(ProblemCode::AccessDenied) => return Err(CoreError::LoginDenied),
+                Some(ProblemCode::ExpiredToken) => return Err(CoreError::LoginExpired),
                 _ => return Err(e.into()),
             },
         }
@@ -77,13 +77,13 @@ pub async fn device_login(
 }
 
 /// RFC 8628's error code, when `e` is a `400` Problem carrying one.
-fn login_code(e: &ApiError) -> Option<&str> {
+fn login_code(e: &ApiError) -> Option<&ProblemCode> {
     match e {
         ApiError::Problem {
             status: 400,
             problem,
             ..
-        } => Some(problem.code.as_str()),
+        } => Some(&problem.code),
         _ => None,
     }
 }
