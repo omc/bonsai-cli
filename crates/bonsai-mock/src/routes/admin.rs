@@ -15,10 +15,13 @@
 //! - `DELETE /_mock/rate_limits`: forgets every rate-limit counter, failed
 //!   authentications included.
 //!
-//! Each answers 204, or a Problem. The checkout page stands in for the
-//! dashboard's, so a browser reaches it without a token:
-//! `GET /_mock/checkout/{account}` shows an "Add card" button, which POSTs
-//! back and gives the account a payment method.
+//! Each answers 204, or a Problem. A few pages stand in for the dashboard's, so
+//! a browser reaches them without a token:
+//!
+//! - `GET /_mock/checkout/{account}` shows an "Add card" button, which POSTs
+//!   back and gives the account a payment method;
+//! - `GET /_mock/clusters/{id}`, a cluster's page (its `dashboard_url`);
+//! - `GET /_mock/api_tokens`, the API Tokens page (`GET /v1`'s `tokens_url`).
 
 use axum::body::Bytes;
 use axum::extract::{FromRequestParts, Path, State};
@@ -49,7 +52,9 @@ pub fn router() -> Router<AppState> {
         )
         .route("/_mock/cli/logins/{user_code}/approve", post(approve))
         .route("/_mock/cli/logins/{user_code}/deny", post(deny))
+        .route("/_mock/clusters/{cluster}", get(cluster_page))
         .route("/_mock/clusters/{cluster}/stats", post(set_stats))
+        .route("/_mock/api_tokens", get(api_tokens_page))
         .route(
             "/_mock/rate_limits",
             axum::routing::delete(reset_rate_limits),
@@ -290,6 +295,48 @@ fn no_account() -> Response {
         StatusCode::NOT_FOUND,
         "No such account",
         "There's no such account.",
+    )
+}
+
+async fn cluster_page(State(state): State<AppState>, Path(cluster): Path<String>) -> Response {
+    use rusqlite::OptionalExtension;
+    let found = state.db(|c| {
+        c.query_row(
+            "SELECT name, account_id FROM clusters WHERE id = ?1",
+            [&cluster],
+            |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?)),
+        )
+        .optional()
+    });
+    match found {
+        Ok(Some((name, account))) => html::page(
+            StatusCode::OK,
+            &name,
+            &format!(
+                "<p>The dashboard's page for cluster <code>{}</code> on account <code>{}</code>. \
+                 This is the mock: there's nothing more here.</p>",
+                html::escape(&cluster),
+                html::escape(&account),
+            ),
+        ),
+        Ok(None) => html::message(
+            StatusCode::NOT_FOUND,
+            "No such cluster",
+            "There's no such cluster.",
+        ),
+        Err(_) => html::message(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "Error",
+            "Something went wrong in the mock.",
+        ),
+    }
+}
+
+async fn api_tokens_page() -> Response {
+    html::message(
+        StatusCode::OK,
+        "API Tokens",
+        "The dashboard's API Tokens page, where a token is made by hand. This is the mock: its tokens are seeded.",
     )
 }
 

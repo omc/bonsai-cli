@@ -124,11 +124,26 @@ impl CredentialRow {
         .optional()
     }
 
-    pub fn to_api(&self) -> Credential {
+    /// The ID of the cluster's default credential: its oldest active `rw` one,
+    /// as the Bonsai API picks it.
+    pub fn default_id(conn: &Connection, cluster_id: &str) -> rusqlite::Result<Option<String>> {
+        conn.query_row(
+            "SELECT id FROM credentials
+             WHERE cluster_id = ?1 AND revoked_at IS NULL AND access_type = 'rw'
+             ORDER BY rowid LIMIT 1",
+            [cluster_id],
+            |r| r.get(0),
+        )
+        .optional()
+    }
+
+    /// `default_id` is the cluster's [`Self::default_id`].
+    pub fn to_api(&self, default_id: Option<&str>) -> Credential {
         Credential {
             id: self.id.clone(),
             name: self.name.clone(),
             access_type: access_type(&self.access_type),
+            default: default_id == Some(self.id.as_str()),
             allowed_actions: self.allowed_actions.clone(),
             allowed_index_globs: self.allowed_index_globs.clone(),
             allowed_cidrs: self.allowed_cidrs.clone(),
@@ -139,8 +154,9 @@ impl CredentialRow {
     /// With its secret and a complete `https://user:pass@host` URL.
     pub fn with_secret(&self, conn: &Connection) -> rusqlite::Result<CredentialWithSecret> {
         let host = engine::cluster_host(conn, &self.cluster_id)?;
+        let default_id = Self::default_id(conn, &self.cluster_id)?;
         Ok(CredentialWithSecret {
-            credential: self.to_api(),
+            credential: self.to_api(default_id.as_deref()),
             username: self.username.clone(),
             password: self.password.clone(),
             url: format!("https://{}:{}@{host}", self.username, self.password),
@@ -167,9 +183,10 @@ async fn list(
     let page = PageParams::from_query(&q)?;
     let creds = state.db(|c| -> Result<Vec<Credential>, ProblemBuilder> {
         let cluster = ClusterRow::find_current(c, &auth, &cluster_id, state.step_ms())?;
+        let default_id = CredentialRow::default_id(c, &cluster.id)?;
         Ok(CredentialRow::active(c, &cluster)?
             .iter()
-            .map(CredentialRow::to_api)
+            .map(|row| row.to_api(default_id.as_deref()))
             .collect())
     })?;
     Ok(Json(paginate(creds, page)))

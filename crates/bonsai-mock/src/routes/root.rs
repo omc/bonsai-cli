@@ -61,6 +61,7 @@ async fn show(State(state): State<AppState>) -> Json<ApiRoot> {
         version: CONTRACT_VERSION.clone(),
         docs_url: state.url("/docs"),
         openapi_url: state.url("/v1/openapi.json"),
+        tokens_url: state.url("/_mock/api_tokens"),
     })
 }
 

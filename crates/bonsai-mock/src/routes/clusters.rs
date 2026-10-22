@@ -142,7 +142,7 @@ impl ClusterRow {
         }
     }
 
-    pub fn to_api(&self, conn: &Connection) -> rusqlite::Result<Cluster> {
+    pub fn to_api(&self, conn: &Connection, app: &AppState) -> rusqlite::Result<Cluster> {
         let actions = ActionRow::for_cluster(conn, &self.id)?;
         let state = self.state(&actions);
         let draft = state == ClusterState::Draft;
@@ -197,6 +197,7 @@ impl ClusterRow {
                 r#type: a.kind.clone(),
                 state: a.state.clone(),
             }),
+            dashboard_url: app.url(&format!("/_mock/clusters/{}", self.id)),
             created_at: self.created_at,
             terminated_at: self.terminated_at,
         })
@@ -358,7 +359,7 @@ async fn list(
             if !keep {
                 continue;
             }
-            let cluster = row.to_api(c)?;
+            let cluster = row.to_api(c, &state)?;
             if wanted_state.is_none_or(|s| cluster.state.as_str() == s) {
                 out.push(cluster);
             }
@@ -376,7 +377,7 @@ async fn show(
     auth.require(Op::ReadClusters)?;
     let cluster = state.db(|c| -> Result<Cluster, ProblemBuilder> {
         let row = ClusterRow::find_current(c, &auth, &id, state.step_ms())?;
-        Ok(row.to_api(c)?)
+        Ok(row.to_api(c, &state)?)
     })?;
     Ok(Json(cluster))
 }
@@ -579,7 +580,7 @@ async fn update(
             params![row.id, name],
         )?;
         let row = ClusterRow::find_current(c, &auth, &id, state.step_ms())?;
-        Ok(row.to_api(c)?)
+        Ok(row.to_api(c, &state)?)
     })?;
     Ok(Json(cluster))
 }

@@ -65,7 +65,7 @@ fn rejects_missing_required_field() {
 
 #[test]
 fn nullable_allof_accepts_null_and_object() {
-    let mut cl = json!({"id":"a","name":"a","state":"draft","plan":null,"region":{"id":"r","name":"r"},"space":null,"release":{"id":"x","name":"x"},"single_tenant":false,"host":null,"port":443,"stats":{"docs":null,"shards":null,"bytes":null,"limits":null,"polled_at":null},"latest_action":null,"created_at":"2026-01-01T00:00:00Z","terminated_at":null});
+    let mut cl = json!({"id":"a","name":"a","state":"draft","plan":null,"region":{"id":"r","name":"r"},"space":null,"release":{"id":"x","name":"x"},"single_tenant":false,"host":null,"port":443,"stats":{"docs":null,"shards":null,"bytes":null,"limits":null,"polled_at":null},"latest_action":null,"dashboard_url":"https://app.bonsai.io/accounts/acme/clusters/a","created_at":"2026-01-01T00:00:00Z","terminated_at":null});
     c().validate_schema("Cluster", &cl).unwrap();
     cl["plan"] = json!({"id":"p","name":"p"});
     c().validate_schema("Cluster", &cl).unwrap();
@@ -96,7 +96,7 @@ fn rejects_undocumented_status() {
 
 #[test]
 fn requires_ratelimit_headers_on_2xx() {
-    let body = json!({"name":"Bonsai API","version":"1.0.0-draft","docs_url":"https://x.io","openapi_url":"https://x.io/o"});
+    let body = json!({"name":"Bonsai API","version":"1.0.0-draft","docs_url":"https://x.io","openapi_url":"https://x.io/o","tokens_url":"https://x.io/t"});
     assert!(matches!(
         c().validate_response(&ResponseCheck {
             method: "GET",
@@ -217,7 +217,7 @@ fn problem_response_rejects_malformed_body() {
 
 #[test]
 fn uri_format_is_enforced() {
-    let body = json!({"name":"Bonsai API","version":"1.0.0-draft","docs_url":"not a uri","openapi_url":"https://x.io/o"});
+    let body = json!({"name":"Bonsai API","version":"1.0.0-draft","docs_url":"not a uri","openapi_url":"https://x.io/o","tokens_url":"https://x.io/t"});
     assert!(matches!(
         c().validate_response(&ResponseCheck {
             method: "GET",
@@ -418,7 +418,7 @@ fn all_of_requires_the_second_branchs_fields() {
     let list = json!({"next_cursor": null});
     assert!(c().validate_schema("ClusterList", &list).is_err());
     let cred = json!({
-        "id": "c", "name": "default", "access_type": "rw", "allowed_actions": [],
+        "id": "c", "name": "default", "access_type": "rw", "default": true, "allowed_actions": [],
         "allowed_index_globs": [], "allowed_cidrs": [], "created_at": "2026-01-01T00:00:00Z",
         "username": "u", "url": "https://u:p@h"
     });
@@ -429,7 +429,7 @@ fn all_of_requires_the_second_branchs_fields() {
 #[test]
 fn a_201_needs_location() {
     let body = json!({
-        "id": "c", "name": "default", "access_type": "rw", "allowed_actions": [],
+        "id": "c", "name": "default", "access_type": "rw", "default": true, "allowed_actions": [],
         "allowed_index_globs": [], "allowed_cidrs": [], "created_at": "2026-01-01T00:00:00Z",
         "username": "u", "password": "p", "url": "https://u:p@h"
     });

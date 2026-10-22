@@ -29,7 +29,7 @@ fn cluster(full: bool) -> Value {
             "stats": {"docs": 10, "shards": 2, "bytes": 2048, "polled_at": T,
                       "limits": {"docs": 100, "shards": null, "bytes": 4096, "daily_bandwidth_bytes": null}},
             "latest_action": {"id": "act_1", "type": "cluster.provision", "state": "success"},
-            "created_at": T, "terminated_at": "2026-02-01T00:00:00Z"
+            "dashboard_url": "https://app.bonsai.io/accounts/acme/clusters/c", "created_at": T, "terminated_at": "2026-02-01T00:00:00Z"
         })
     } else {
         json!({
@@ -37,7 +37,7 @@ fn cluster(full: bool) -> Value {
             "region": rf("aws-us-east-1"), "space": null, "release": rf("opensearch-3.8.0"),
             "single_tenant": false, "host": null, "port": 443,
             "stats": {"docs": null, "shards": null, "bytes": null, "polled_at": null, "limits": null},
-            "latest_action": null, "created_at": T, "terminated_at": null
+            "latest_action": null, "dashboard_url": "https://app.bonsai.io/accounts/acme/clusters/c", "created_at": T, "terminated_at": null
         })
     }
 }
@@ -61,7 +61,7 @@ fn action(full: bool) -> Value {
 }
 
 fn credential() -> Value {
-    json!({"id": "cr-1", "name": null, "access_type": "acl", "allowed_actions": ["indices:data/read"],
+    json!({"id": "cr-1", "name": null, "access_type": "acl", "default": false, "allowed_actions": ["indices:data/read"],
            "allowed_index_globs": ["logs-*"], "allowed_cidrs": ["203.0.113.0/24"], "created_at": T})
 }
 
@@ -69,7 +69,7 @@ fn credential() -> Value {
 fn api_root() {
     check::<ApiRoot>(
         "ApiRoot",
-        json!({"name": "Bonsai API", "version": "1.0.0", "docs_url": "https://bonsai.io/docs", "openapi_url": "https://api.bonsai.io/v1/openapi.json"}),
+        json!({"name": "Bonsai API", "version": "1.0.0", "docs_url": "https://bonsai.io/docs", "openapi_url": "https://api.bonsai.io/v1/openapi.json", "tokens_url": "https://app.bonsai.io/api_tokens"}),
     );
 }
 

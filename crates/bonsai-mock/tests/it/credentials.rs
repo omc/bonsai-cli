@@ -125,6 +125,55 @@ async fn create_list_get_revoke_round_trip() {
     assert_eq!(list(&m, &cluster).await, default);
 }
 
+/// The oldest active rw credential is the default, in the list and on its own;
+/// when it's revoked, the next oldest rw one takes over.
+#[tokio::test]
+async fn the_oldest_rw_credential_is_the_default() {
+    let m = Mock::start().await;
+    let cluster = m.ready_cluster("Creds", "standard-fir").await;
+    let first = list(&m, &cluster).await.remove(0);
+    let (status, ro) = post(&m, &cluster, json!({"name": "ro", "access_type": "ro"})).await;
+    assert_eq!(status, 201);
+    assert_eq!(ro.unwrap()["default"], false);
+    let (status, rw) = post(&m, &cluster, json!({"name": "rw2", "access_type": "rw"})).await;
+    assert_eq!(status, 201);
+    let rw = rw.unwrap();
+    assert_eq!(rw["default"], false);
+    let rw = rw["id"].as_str().unwrap().to_string();
+
+    let defaults = |body: Value| -> Vec<(String, bool)> {
+        body["data"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|c| {
+                (
+                    c["id"].as_str().unwrap().to_string(),
+                    c["default"].as_bool().unwrap(),
+                )
+            })
+            .filter(|(_, d)| *d)
+            .collect()
+    };
+    let (_, _, body) = m
+        .call("GET", &creds(&cluster), Some(&m.acme), None, &[])
+        .await;
+    assert_eq!(defaults(body.unwrap()), [(first.clone(), true)]);
+    let (_, _, shown) = m
+        .call("GET", &cred(&cluster, &first), Some(&m.acme), None, &[])
+        .await;
+    assert_eq!(shown.unwrap()["default"], true);
+
+    let (status, _, _) = m
+        .call("DELETE", &cred(&cluster, &first), Some(&m.acme), None, &[])
+        .await;
+    assert_eq!(status, 204);
+    let (_, _, body) = m
+        .call("GET", &creds(&cluster), Some(&m.acme), None, &[])
+        .await;
+    assert_eq!(defaults(body.unwrap()), [(rw, true)]);
+}
+
 #[tokio::test]
 async fn unknown_cluster_or_credential_is_404() {
     let m = Mock::start().await;

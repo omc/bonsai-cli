@@ -78,7 +78,7 @@ fn cluster_json(id: &str) -> Value {
         "release": {"id": "opensearch-3.8.0", "name": "OpenSearch 3.8.0"},
         "single_tenant": false, "host": null, "port": 443,
         "stats": {"docs": null, "shards": null, "bytes": null, "polled_at": null, "limits": null},
-        "latest_action": null, "created_at": T, "terminated_at": null
+        "latest_action": null, "dashboard_url": "https://app.bonsai.io/accounts/acme/clusters/c", "created_at": T, "terminated_at": null
     })
 }
 

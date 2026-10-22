@@ -35,6 +35,8 @@ pub struct ApiRoot {
     pub version: String,
     pub docs_url: String,
     pub openapi_url: String,
+    /// The dashboard's API Tokens page, for the signed-in person's default account.
+    pub tokens_url: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -71,6 +73,8 @@ pub struct Cluster {
     pub stats: ClusterStats,
     #[serde(deserialize_with = "required_nullable")]
     pub latest_action: Option<ActionRef>,
+    /// The cluster's page in the dashboard.
+    pub dashboard_url: String,
     pub created_at: Timestamp,
     #[serde(deserialize_with = "required_nullable")]
     pub terminated_at: Option<Timestamp>,
@@ -268,6 +272,8 @@ pub struct Credential {
     #[serde(deserialize_with = "required_nullable")]
     pub name: Option<String>,
     pub access_type: AccessType,
+    /// The cluster's default credential, whose URL the dashboard shows.
+    pub default: bool,
     pub allowed_actions: Vec<String>,
     pub allowed_index_globs: Vec<String>,
     pub allowed_cidrs: Vec<String>,

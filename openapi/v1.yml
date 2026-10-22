@@ -907,12 +907,13 @@ components:
   schemas:
     ApiRoot:
       type: object
-      required: [name, version, docs_url, openapi_url]
+      required: [name, version, docs_url, openapi_url, tokens_url]
       properties:
         name: { type: string, description: "`Bonsai API`." }
         version: { type: string, description: "This contract's `info.version`." }
         docs_url: { type: string, format: uri, description: The API reference. }
         openapi_url: { type: string, format: uri, description: This contract as JSON. }
+        tokens_url: { type: string, format: uri, description: "The dashboard's API Tokens page, where a token is made by hand. It names no account: it opens the signed-in person's default account." }
 
     Account:
       type: object
@@ -1019,7 +1020,7 @@ components:
 
     Cluster:
       type: object
-      required: [id, name, state, plan, region, space, release, single_tenant, host, port, stats, latest_action, created_at, terminated_at]
+      required: [id, name, state, plan, region, space, release, single_tenant, host, port, stats, latest_action, dashboard_url, created_at, terminated_at]
       properties:
         id: { type: string, description: "The slug. Never changes, never reused." }
         name: { type: string, description: A label; can change and isn't unique. }
@@ -1033,6 +1034,7 @@ components:
         port: { type: integer }
         stats: { $ref: "#/components/schemas/ClusterStats" }
         latest_action: { allOf: [{ $ref: "#/components/schemas/ActionRef" }], nullable: true }
+        dashboard_url: { type: string, format: uri, description: The cluster's page in the dashboard. }
         created_at: { type: string, format: date-time }
         terminated_at: { type: string, format: date-time, nullable: true }
     ClusterStats:
@@ -1269,11 +1271,14 @@ components:
 
     Credential:
       type: object
-      required: [id, name, access_type, allowed_actions, allowed_index_globs, allowed_cidrs, created_at]
+      required: [id, name, access_type, default, allowed_actions, allowed_index_globs, allowed_cidrs, created_at]
       properties:
         id: { type: string }
         name: { type: string, nullable: true }
         access_type: { type: string, x-extensible-enum: [rw, ro, rwm, acl] }
+        default:
+          type: boolean
+          description: "The cluster's default credential: its oldest active `rw` one, whose URL the dashboard shows as the cluster's. Exactly one of a cluster's credentials while it has an active `rw` one, which it does from provisioning until it's terminated, since the last one can't be revoked."
         allowed_actions: { type: array, items: { type: string } }
         allowed_index_globs: { type: array, items: { type: string } }
         allowed_cidrs: { type: array, items: { type: string } }

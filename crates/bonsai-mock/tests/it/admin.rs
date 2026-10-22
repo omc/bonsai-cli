@@ -246,6 +246,36 @@ async fn the_checkout_page_adds_a_card() {
     assert_eq!(status, 202);
 }
 
+/// The pages `dashboard_url` and `tokens_url` point at, which stand in for the
+/// dashboard's.
+#[tokio::test]
+async fn the_dashboard_links_are_pages() {
+    let m = Mock::start().await;
+    let cluster = m.ready_cluster("Shown", "standard-fir").await;
+    let link = m.cluster(&cluster).await["dashboard_url"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    assert_eq!(link, m.url(&format!("/_mock/clusters/{cluster}")));
+    let resp = m.http.get(&link).send().await.unwrap();
+    assert_eq!(resp.status().as_u16(), 200);
+    let html = resp.text().await.unwrap();
+    assert!(html.contains("<h1>Shown</h1>"), "{html}");
+
+    let resp = m
+        .http
+        .get(m.url("/_mock/clusters/%3Cb%3Enone"))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(resp.status().as_u16(), 404);
+    assert!(!resp.text().await.unwrap().contains("<b>"));
+
+    let resp = m.http.get(m.url("/_mock/api_tokens")).send().await.unwrap();
+    assert_eq!(resp.status().as_u16(), 200);
+    assert!(resp.text().await.unwrap().contains("API Tokens"));
+}
+
 #[tokio::test]
 async fn checkout_for_an_unknown_account() {
     let m = Mock::start().await;
@@ -286,7 +316,9 @@ async fn openapi_json_is_the_contract() {
 
     // The root points at it.
     let (_, _, root) = m.call("GET", "", None, None, &[]).await;
-    assert_eq!(root.unwrap()["openapi_url"], m.url("/v1/openapi.json"));
+    let root = root.unwrap();
+    assert_eq!(root["openapi_url"], m.url("/v1/openapi.json"));
+    assert_eq!(root["tokens_url"], m.url("/_mock/api_tokens"));
     assert_eq!(
         spec["info"]["version"],
         m.call("GET", "", None, None, &[]).await.2.unwrap()["version"]
