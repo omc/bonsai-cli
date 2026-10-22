@@ -31,10 +31,11 @@ pub fn plan_choice(plan: &Plan) -> String {
     format!("{} — {}", plan.name, plan_price(plan))
 }
 
-/// The plan's releases as a prompt shows them, in the plan's order, with the
-/// release's name when the catalogue has it. The first is the default.
-pub fn release_choices(plan: &Plan, releases: &[Release]) -> Vec<String> {
-    plan.releases
+/// The releases a plan offers in a region (its offer's) as a prompt shows them,
+/// in offer order, with the release's name when the catalogue has it. The first
+/// is the default.
+pub fn release_choices(offered: &[String], releases: &[Release]) -> Vec<String> {
+    offered
         .iter()
         .enumerate()
         .map(|(i, id)| {
@@ -437,7 +438,12 @@ mod tests {
     use super::*;
     use serde_json::json;
 
+    /// Offered with every one of `releases` in each of `regions`.
     fn plan(id: &str, cents: u64, regions: &[&str], releases: &[&str]) -> Plan {
+        let offers: Vec<_> = regions
+            .iter()
+            .map(|r| json!({"region": r, "releases": releases}))
+            .collect();
         serde_json::from_value(json!({
             "id": id,
             "name": format!("Plan {id}"),
@@ -447,6 +453,7 @@ mod tests {
             "private_network": false,
             "regions": regions,
             "releases": releases,
+            "offers": offers,
         }))
         .unwrap()
     }
@@ -488,16 +495,19 @@ mod tests {
 
     #[test]
     fn the_first_release_is_the_default() {
-        let p = plan("s", 0, &[], &["opensearch-3.8.0", "opensearch-2.19.6"]);
+        let offered = [
+            "opensearch-3.8.0".to_owned(),
+            "opensearch-2.19.6".to_owned(),
+        ];
         let catalogue = [release("opensearch-3.8.0", "OpenSearch 3.8.0")];
         assert_eq!(
-            release_choices(&p, &catalogue),
+            release_choices(&offered, &catalogue),
             [
                 "opensearch-3.8.0 (OpenSearch 3.8.0) — default",
                 "opensearch-2.19.6",
             ]
         );
-        assert!(release_choices(&plan("e", 0, &[], &[]), &catalogue).is_empty());
+        assert!(release_choices(&[], &catalogue).is_empty());
     }
 
     #[test]

@@ -295,11 +295,11 @@ async fn choose(ctx: &Ctx, client: &Client, args: &CreateArgs) -> Result<Choice>
             (plan.id.clone(), Some(plan))
         }
     };
-    // A release is asked for only with a plan that was: otherwise the API's best fit
-    // is the default, as it is for scripts.
+    // A release is asked for only with a plan that was: otherwise the API's default
+    // (the region's first the space can place) applies, as it does for scripts.
     let release = match (&args.release, prompted) {
         (Some(r), _) => Some(r.clone()),
-        (None, Some(plan)) => ask_release(ctx, client, &plan).await?,
+        (None, Some(plan)) => ask_release(ctx, client, &plan, &region).await?,
         (None, None) => None,
     };
     Ok(Choice {
@@ -362,8 +362,21 @@ async fn ask_plan(ctx: &Ctx, client: &Client, region: &str) -> Result<Plan> {
     Ok(offered[select("Plan", labels)?].clone())
 }
 
-async fn ask_release(ctx: &Ctx, client: &Client, plan: &Plan) -> Result<Option<String>> {
-    if plan.releases.is_empty() {
+/// Asks for one of the releases the plan offers in `region`, the first (the API's
+/// default there) preselected.
+async fn ask_release(
+    ctx: &Ctx,
+    client: &Client,
+    plan: &Plan,
+    region: &str,
+) -> Result<Option<String>> {
+    let offered = plan.releases_in(region).ok_or_else(|| {
+        usage(format!(
+            "plan {} isn't offered in {region}; `bonsai plans --region {region}` lists the plans that are",
+            plan.id
+        ))
+    })?;
+    if offered.is_empty() {
         return Ok(None);
     }
     let releases = all_pages(
@@ -371,11 +384,11 @@ async fn ask_release(ctx: &Ctx, client: &Client, plan: &Plan) -> Result<Option<S
         |c| async move { client.list_releases(c.as_deref()).await },
     )
     .await?;
-    let labels = release_choices(plan, &releases)
+    let labels = release_choices(offered, &releases)
         .into_iter()
         .map(|l| sanitize(&l, false).into_owned())
         .collect();
-    Ok(Some(plan.releases[select("Release", labels)?].clone()))
+    Ok(Some(offered[select("Release", labels)?].clone()))
 }
 
 /// The index of the option picked; the first is the default.

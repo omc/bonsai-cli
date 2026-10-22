@@ -49,8 +49,7 @@ pub async fn plans(ctx: &Ctx, args: PlansArgs) -> Result<()> {
         let client = &a.client;
         let (plans, raw) = all(|c| async move { client.list_plans(c.as_deref()).await }).await?;
         let (plans, raw) = filter(plans, raw, |p: &Plan| {
-            args.region.as_ref().is_none_or(|r| p.regions.contains(r))
-                && args.release.as_ref().is_none_or(|v| p.releases.contains(v))
+            plan_matches(p, args.region.as_deref(), args.release.as_deref())
         });
         if ctx.out.is_json() {
             return ctx.out.json(&Value::Array(raw));
@@ -72,6 +71,18 @@ pub async fn plans(ctx: &Ctx, args: PlansArgs) -> Result<()> {
         ctx.out.table(&PLAN_COLUMNS, rows, args.wide)
     })
     .await
+}
+
+/// Whether `plan` passes `--region` and `--release`: offered in the region, with
+/// the release; with both, with the release in that region.
+fn plan_matches(plan: &Plan, region: Option<&str>, release: Option<&str>) -> bool {
+    let has = |releases: &[String], v: &str| releases.iter().any(|r| r == v);
+    match (region, release) {
+        (Some(r), Some(v)) => plan.releases_in(r).is_some_and(|o| has(o, v)),
+        (Some(r), None) => plan.releases_in(r).is_some(),
+        (None, Some(v)) => has(&plan.releases, v),
+        (None, None) => true,
+    }
 }
 
 pub async fn regions(ctx: &Ctx, args: WideArgs) -> Result<()> {

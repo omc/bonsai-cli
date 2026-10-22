@@ -186,6 +186,34 @@ async fn plans_filter_on_the_cli_side() {
         .unwrap();
     assert!(out.status.success(), "{}", stderr(&out));
     assert_eq!(stdout_json(&out), json!([]));
+
+    // With both, the release must be offered in that region: Standard offers
+    // OpenSearch 2.19.6, but not in us-west-2.
+    let ids = |region: &str| -> Vec<String> {
+        let out = env
+            .authed()
+            .args([
+                "plans",
+                "--region",
+                region,
+                "--release",
+                "opensearch-2.19.6",
+            ])
+            .arg("--json")
+            .output()
+            .unwrap();
+        assert!(out.status.success(), "{}", stderr(&out));
+        let v = stdout_json(&out);
+        v.as_array()
+            .unwrap()
+            .iter()
+            .map(|p| p["id"].as_str().unwrap().to_owned())
+            .collect()
+    };
+    let west = ids("aws-us-west-2");
+    assert!(west.contains(&"business-lg".to_owned()), "{west:?}");
+    assert!(!west.contains(&"standard-fir".to_owned()), "{west:?}");
+    assert!(ids("aws-us-east-1").contains(&"standard-fir".to_owned()));
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]

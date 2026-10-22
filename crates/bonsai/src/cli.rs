@@ -192,7 +192,7 @@ pub struct CreateArgs {
     /// A private space's ID, instead of a region
     #[arg(long, value_name = "S")]
     pub space: Option<String>,
-    /// The release's ID (default: the plan's best fit)
+    /// The release's ID (default: the first the plan offers in the region)
     #[arg(long, value_name = "V")]
     pub release: Option<String>,
     /// Leave a cluster whose create failed instead of removing it
@@ -349,7 +349,7 @@ pub struct PlansArgs {
     /// Only plans offered in this region
     #[arg(long, value_name = "R")]
     pub region: Option<String>,
-    /// Only plans offering this release
+    /// Only plans offering this release (in --region, with both)
     #[arg(long, value_name = "V")]
     pub release: Option<String>,
     /// Show every column
