@@ -98,15 +98,14 @@ jobs:
         env:
           BONSAI_API_URL: http://127.0.0.1:9/v1
 
-  # `nix run github:omc/bonsai-cli` builds flake.nix; check it still builds. The
-  # check skips the release profile's LTO, which musl already covers.
+  # `nix run github:omc/bonsai-cli` builds flake.nix; check it still builds.
   nix:
     needs: [fmt, clippy, deny]
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v6
       - uses: cachix/install-nix-action@v31
-      - run: nix build -L .#checks.x86_64-linux.build
+      - run: nix build -L
       - run: ./result/bin/bonsai version
         env:
           BONSAI_API_URL: http://127.0.0.1:9/v1
