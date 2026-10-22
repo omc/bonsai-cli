@@ -830,8 +830,12 @@ async fn history_times_are_compact_unless_wide() {
         };
         let (short, wide) = (header(&[]), header(&["--wide"]));
         assert!(wide.contains("STARTED"), "{cols}: {wide}");
+        // Column names, not the header line: widths follow the rows, and the
+        // relative STARTED time ("just now", "2 seconds ago") can change width
+        // between the two runs.
+        let names = |h: &str| h.split_whitespace().map(str::to_owned).collect::<Vec<_>>();
         assert!(
-            wide.starts_with(short.as_str()),
+            names(&wide).starts_with(&names(&short)),
             "{cols}: {short:?} vs {wide:?}"
         );
     }
