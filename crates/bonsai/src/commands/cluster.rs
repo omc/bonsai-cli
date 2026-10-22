@@ -284,7 +284,11 @@ async fn choose(ctx: &Ctx, client: &Client, args: &CreateArgs) -> Result<Choice>
     let region = match region {
         Some(r) => r,
         None => {
-            let (r, s) = ask_region_and_space(ctx, client).await?;
+            let only = match &args.plan {
+                Some(p) => plan_regions(ctx, client, p).await?,
+                None => None,
+            };
+            let (r, s) = ask_region_and_space(ctx, client, only.as_deref()).await?;
             space = s;
             r
         }
@@ -313,14 +317,43 @@ async fn choose(ctx: &Ctx, client: &Client, args: &CreateArgs) -> Result<Choice>
 
 const SHARED: &str = "Shared";
 
-async fn ask_region_and_space(ctx: &Ctx, client: &Client) -> Result<(String, Option<String>)> {
-    let regions = all_pages(
+/// The regions `--plan` is offered in, to ask among only those. `None` (ask among
+/// every region) when the plan offers none by region, such as a plan the
+/// catalogue doesn't list, or isn't found: the create's own refusal then says why.
+async fn plan_regions(ctx: &Ctx, client: &Client, plan: &str) -> Result<Option<Vec<String>>> {
+    let found = ctx
+        .abortable(async {
+            match client.get_plan(plan).await {
+                Ok(p) => Ok(Some(p.value)),
+                Err(e) if e.status() == Some(404) => Ok(None),
+                Err(e) => Err(e.into()),
+            }
+        })
+        .await?;
+    Ok(found
+        .map(|p| p.regions)
+        .filter(|regions| !regions.is_empty()))
+}
+
+/// Asks for a region, among `only` when given, then for a space in it.
+async fn ask_region_and_space(
+    ctx: &Ctx,
+    client: &Client,
+    only: Option<&[String]>,
+) -> Result<(String, Option<String>)> {
+    let regions: Vec<_> = all_pages(
         ctx,
         |c| async move { client.list_regions(c.as_deref()).await },
     )
-    .await?;
+    .await?
+    .into_iter()
+    .filter(|r| only.is_none_or(|ids| ids.contains(&r.id)))
+    .collect();
     if regions.is_empty() {
-        anyhow::bail!("no region is open for new clusters");
+        anyhow::bail!(match only {
+            Some(_) => "the plan isn't offered in any region open for new clusters",
+            None => "no region is open for new clusters",
+        });
     }
     let labels = regions
         .iter()
