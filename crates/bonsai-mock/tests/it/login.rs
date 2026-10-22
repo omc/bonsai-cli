@@ -26,8 +26,12 @@ async fn start(m: &Mock, hostname: &str) -> Value {
         .await;
     let body = body.unwrap();
     assert_eq!(status, 200, "{body}");
-    assert!(header(&h, "ratelimit").is_some());
-    assert!(header(&h, "ratelimit-policy").is_some());
+    assert!(
+        header(&h, "ratelimit")
+            .unwrap()
+            .starts_with("\"starts\";r=")
+    );
+    assert_eq!(header(&h, "ratelimit-policy"), Some("\"starts\";q=10;w=60"));
     body
 }
 
@@ -42,8 +46,8 @@ async fn poll(m: &Mock, device_code: &str) -> (u16, Value) {
         )
         .await;
     if status == 200 {
-        assert!(header(&h, "ratelimit").is_some());
-        assert!(header(&h, "ratelimit-policy").is_some());
+        assert!(header(&h, "ratelimit").unwrap().starts_with("\"polls\";r="));
+        assert_eq!(header(&h, "ratelimit-policy"), Some("\"polls\";q=60;w=60"));
     } else {
         assert_eq!(header(&h, "content-type"), Some("application/problem+json"));
     }
@@ -366,14 +370,27 @@ async fn start_checks_its_body() {
 #[tokio::test]
 async fn starting_is_limited_to_ten_a_minute_per_ip() {
     let m = Mock::start().await;
-    for _ in 0..10 {
-        start(&m, "h").await;
+    for i in 0..10 {
+        let (_, h, _) = m
+            .call("POST", "/cli/logins", None, Some(start_body("h")), &[])
+            .await;
+        let ratelimit = header(&h, "ratelimit").unwrap();
+        assert!(
+            ratelimit.starts_with(&format!("\"starts\";r={};t=", 9 - i)),
+            "{ratelimit}"
+        );
     }
     let (status, h, problem) = m
         .call("POST", "/cli/logins", None, Some(start_body("h")), &[])
         .await;
     assert_eq!(status, 429);
     assert!(header(&h, "retry-after").is_some());
+    assert!(
+        header(&h, "ratelimit")
+            .unwrap()
+            .starts_with("\"starts\";r=0;t=")
+    );
+    assert_eq!(header(&h, "ratelimit-policy"), Some("\"starts\";q=10;w=60"));
     assert_eq!(problem.unwrap()["code"], "rate_limited");
     // Polling isn't limited by it.
     let (status, _) = poll(&m, &"x".repeat(32)).await;
@@ -398,6 +415,7 @@ async fn polling_is_limited_to_sixty_a_minute_per_ip() {
         .await;
     assert_eq!(status, 429);
     assert!(header(&h, "retry-after").is_some());
+    assert_eq!(header(&h, "ratelimit-policy"), Some("\"polls\";q=60;w=60"));
     assert_eq!(problem.unwrap()["code"], "rate_limited");
     // Starting isn't limited by it.
     start(&m, "h").await;

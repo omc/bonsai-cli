@@ -153,7 +153,21 @@ fn authenticate(state: &AppState, headers: &HeaderMap) -> Result<Option<Auth>, P
 
 pub const RATE_LIMIT_QUOTA: u32 = 600;
 pub const RATE_LIMIT_WINDOW: Duration = Duration::from_secs(60);
-const RATE_LIMIT_POLICY: &str = "\"token\";q=600;w=60";
+
+/// A quota as `RateLimit` and `RateLimit-Policy` name it, and what its 429 says.
+#[derive(Debug, Clone, Copy)]
+pub struct Quota {
+    pub name: &'static str,
+    pub per_window: u32,
+    pub refusal: &'static str,
+}
+
+/// Every route's quota but the login endpoints'.
+pub const TOKEN_QUOTA: Quota = Quota {
+    name: "token",
+    per_window: RATE_LIMIT_QUOTA,
+    refusal: "Too many requests for this token. Wait for the Retry-After seconds, then try again.",
+};
 
 /// The most counters [`RateLimiter`] keeps.
 pub const MAX_LIMITER_KEYS: usize = 10_000;
@@ -173,18 +187,6 @@ struct Hit {
 impl RateLimiter {
     fn hit(&self, key: &str) -> Hit {
         self.hit_quota(key, RATE_LIMIT_QUOTA)
-    }
-
-    /// Counts a request against `key`, which allows `quota` per
-    /// [`RATE_LIMIT_WINDOW`]. Returns `Err(seconds until the window resets)`
-    /// once over quota.
-    pub(crate) fn check(&self, key: &str, quota: u32) -> Result<(), u64> {
-        let hit = self.hit_quota(key, quota);
-        if hit.exceeded {
-            Err(hit.reset_secs)
-        } else {
-            Ok(())
-        }
     }
 
     /// Forgets every counter.
@@ -305,7 +307,7 @@ pub async fn limit_by_token(State(state): State<AppState>, req: Request, next: N
         Ok(Some(auth)) => format!("token:{}", auth.token_id),
         _ => ip_key(&req),
     };
-    let resp = limit(state.clone(), key, req, next).await;
+    let resp = limit(state.clone(), key, TOKEN_QUOTA, req, next).await;
     if resp.status() == StatusCode::UNAUTHORIZED {
         state.limiter().hit(&failed);
     }
@@ -315,33 +317,56 @@ pub async fn limit_by_token(State(state): State<AppState>, req: Request, next: N
 /// Middleware for `GET /v1`: rate-limited per IP.
 pub async fn limit_by_ip(State(state): State<AppState>, req: Request, next: Next) -> Response {
     let key = ip_key(&req);
-    limit(state, key, req, next).await
+    limit(state, key, TOKEN_QUOTA, req, next).await
+}
+
+/// Middleware for a route with a per-IP quota of its own, such as the login
+/// endpoints: counted under `scope` and the client's IP, apart from every other
+/// counter, and reported under the quota's own name.
+pub async fn limit_ip_quota(
+    state: AppState,
+    scope: &str,
+    quota: Quota,
+    req: Request,
+    next: Next,
+) -> Response {
+    let key = format!("{scope}:{}", ClientIp::of(req.extensions()).0);
+    limit(state, key, quota, req, next).await
 }
 
 /// Counts the request, answers 429 when over quota or when the
 /// `rate_limit_next` scenario says so, and puts `RateLimit` and
 /// `RateLimit-Policy` on every response.
-async fn limit(state: AppState, key: String, req: Request, next: Next) -> Response {
+async fn limit(state: AppState, key: String, quota: Quota, req: Request, next: Next) -> Response {
     let method = req.method().to_string();
     let path = req.uri().path().to_string();
-    let hit = state.limiter().hit(&key);
+    let hit = state.limiter().hit_quota(&key, quota.per_window);
     let forced = state.db(|c| scenario::take_counter(c, "rate_limit_next"));
 
     let (mut resp, remaining) = match forced {
         Err(e) => (ProblemBuilder::from(e).into_response(), hit.remaining),
-        Ok(true) => (rate_limited(1).into_response(), 0),
-        Ok(false) if hit.exceeded => (rate_limited(hit.reset_secs).into_response(), 0),
+        Ok(true) => (rate_limited(quota, 1).into_response(), 0),
+        Ok(false) if hit.exceeded => (rate_limited(quota, hit.reset_secs).into_response(), 0),
         Ok(false) => (next.run(req).await, hit.remaining),
     };
     let headers = resp.headers_mut();
     headers.insert(
         "ratelimit",
-        HeaderValue::from_str(&format!("\"token\";r={remaining};t={}", hit.reset_secs))
-            .expect("ASCII"),
+        HeaderValue::from_str(&format!(
+            "\"{}\";r={remaining};t={}",
+            quota.name, hit.reset_secs
+        ))
+        .expect("ASCII"),
     );
     headers.insert(
         "ratelimit-policy",
-        HeaderValue::from_static(RATE_LIMIT_POLICY),
+        HeaderValue::from_str(&format!(
+            "\"{}\";q={};w={}",
+            quota.name,
+            quota.per_window,
+            RATE_LIMIT_WINDOW.as_secs()
+        ))
+        .expect("ASCII"),
     );
 
     log_request(&state, &method, &path, resp.status().as_u16());
@@ -360,11 +385,11 @@ fn log_request(state: &AppState, method: &str, path: &str, status: u16) {
     }
 }
 
-fn rate_limited(retry_after: u64) -> ProblemBuilder {
+fn rate_limited(quota: Quota, retry_after: u64) -> ProblemBuilder {
     status_problem(
         StatusCode::TOO_MANY_REQUESTS,
         ProblemCode::RateLimited,
-        "Too many requests for this token. Wait for the Retry-After seconds, then try again.",
+        quota.refusal,
     )
     .retry_after(retry_after)
 }

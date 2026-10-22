@@ -7,6 +7,10 @@
 //!   400 `authorization_pending`, `slow_down`, `access_denied` or
 //!   `expired_token` (RFC 8628's codes, as Problems), or, once, the token.
 //!   At most [`POLLS_PER_MINUTE`] per IP.
+//!
+//!   Each has its own per-IP counter, and its `RateLimit` and
+//!   `RateLimit-Policy` report it (`"starts";q=10;w=60`, `"polls";q=60;w=60`),
+//!   as the Bonsai API's do, not `GET /v1`'s `"token"` quota.
 //! - `GET /_mock/cli/approve?user_code=` is the dashboard's approval page,
 //!   and `POST /_mock/cli/approve` its form. The admin API approves or
 //!   denies through [`decide`] too.
@@ -17,8 +21,9 @@
 //! the Bonsai API would say 5) so tests are fast.
 
 use axum::body::Bytes;
-use axum::extract::State;
+use axum::extract::{Request, State};
 use axum::http::StatusCode;
+use axum::middleware::{Next, from_fn_with_state};
 use axum::response::Response;
 use axum::routing::{get, post};
 use axum::{Json, Router};
@@ -27,7 +32,7 @@ use jiff::{SignedDuration, Timestamp};
 use rusqlite::{Connection, OptionalExtension, params};
 use serde_json::{Value, json};
 
-use crate::http::{ClientIp, JsonBody, QueryParams, string_body};
+use crate::http::{ClientIp, JsonBody, QueryParams, Quota, limit_ip_quota, string_body};
 use crate::problem::{ProblemBuilder, invalid_parameter, status_problem};
 use crate::{AppState, db, html, ids, seed};
 
@@ -60,10 +65,35 @@ const START_FIELDS: &[&str] = &["client_name", "hostname", "os"];
 const POLL_FIELDS: &[&str] = &["device_code"];
 const FIELD_MAX_CHARS: usize = 255;
 
-pub fn router() -> Router<AppState> {
+const STARTS: Quota = Quota {
+    name: "starts",
+    per_window: STARTS_PER_MINUTE,
+    refusal: "Too many logins started from this address. At most 10 a minute.",
+};
+const POLLS: Quota = Quota {
+    name: "polls",
+    per_window: POLLS_PER_MINUTE,
+    refusal: "Too many polls from this address. At most 60 a minute.",
+};
+
+pub fn router(state: AppState) -> Router<AppState> {
     Router::new()
-        .route("/v1/cli/logins", post(start))
-        .route("/v1/cli/logins/token", post(poll))
+        .route(
+            "/v1/cli/logins",
+            post(start).route_layer(from_fn_with_state(state.clone(), limit_starts)),
+        )
+        .route(
+            "/v1/cli/logins/token",
+            post(poll).route_layer(from_fn_with_state(state, limit_polls)),
+        )
+}
+
+async fn limit_starts(State(state): State<AppState>, req: Request, next: Next) -> Response {
+    limit_ip_quota(state, "cli_login", STARTS, req, next).await
+}
+
+async fn limit_polls(State(state): State<AppState>, req: Request, next: Next) -> Response {
+    limit_ip_quota(state, "cli_login_poll", POLLS, req, next).await
 }
 
 /// The approval page, outside `/v1` and its rate limits.
@@ -78,12 +108,6 @@ async fn start(
     ClientIp(ip): ClientIp,
     body: Result<JsonBody, ProblemBuilder>,
 ) -> Result<Json<CliLoginGrant>, ProblemBuilder> {
-    limit_per_ip(
-        &state,
-        &format!("cli_login:{ip}"),
-        STARTS_PER_MINUTE,
-        "logins started",
-    )?;
     let body = string_body(body?.0, START_FIELDS, START_FIELDS)?;
     for field in START_FIELDS {
         let chars = body[*field].chars().count();
@@ -139,24 +163,6 @@ async fn start(
     }))
 }
 
-/// 429 `rate_limited` once `key` has made more than `per_minute` requests
-/// in the limiter's window.
-fn limit_per_ip(
-    state: &AppState,
-    key: &str,
-    per_minute: u32,
-    what: &str,
-) -> Result<(), ProblemBuilder> {
-    state.limiter().check(key, per_minute).map_err(|reset| {
-        status_problem(
-            StatusCode::TOO_MANY_REQUESTS,
-            ProblemCode::RateLimited,
-            format!("Too many {what} from this address. At most {per_minute} a minute."),
-        )
-        .retry_after(reset)
-    })
-}
-
 /// `XXXX-XXXX` from [`USER_CODE_LETTERS`].
 fn new_user_code() -> String {
     let letters = ids::random_from(USER_CODE_LETTERS, 8);
@@ -198,15 +204,8 @@ fn expired_token() -> ProblemBuilder {
 
 async fn poll(
     State(state): State<AppState>,
-    ClientIp(ip): ClientIp,
     body: Result<JsonBody, ProblemBuilder>,
 ) -> Result<Json<Value>, ProblemBuilder> {
-    limit_per_ip(
-        &state,
-        &format!("cli_login_poll:{ip}"),
-        POLLS_PER_MINUTE,
-        "polls",
-    )?;
     let body = string_body(body?.0, POLL_FIELDS, POLL_FIELDS)?;
     let hash = seed::sha256_hex(&body["device_code"]);
     let now = Timestamp::now();

@@ -137,9 +137,11 @@ impl AppState {
 ///   outside the rate limits, so they never take from `rate_limit_next`.
 pub fn app(state: AppState) -> Router {
     let by_ip = routes::root::router()
-        .merge(routes::login::router())
         .method_not_allowed_fallback(|| async { problem::not_found() })
         .route_layer(from_fn_with_state(state.clone(), http::limit_by_ip));
+    // Per IP too, but each endpoint against a quota of its own
+    let login = routes::login::router(state.clone())
+        .method_not_allowed_fallback(|| async { problem::not_found() });
     let by_token = Router::new()
         .merge(routes::account::router())
         .merge(routes::catalogue::router())
@@ -155,6 +157,7 @@ pub fn app(state: AppState) -> Router {
         .merge(routes::login::page_router());
     Router::new()
         .merge(by_ip)
+        .merge(login)
         .merge(by_token)
         .merge(unlimited)
         .fallback(|| async { problem::not_found() })
