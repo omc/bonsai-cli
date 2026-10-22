@@ -98,9 +98,39 @@ jobs:
         env:
           BONSAI_API_URL: http://127.0.0.1:9/v1
 
-  # `nix run github:omc/bonsai-cli` builds flake.nix; check it still builds.
+  # Whether this push or PR touches what the nix build reads, for `nix`. A plain
+  # diff, not paths-filter: on a PR that needs `pull-requests: read`, which
+  # release.yml doesn't grant when it calls this workflow.
+  changes:
+    runs-on: ubuntu-24.04
+    outputs:
+      nix: ${{ steps.diff.outputs.nix }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - id: diff
+        env:
+          BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          # A new branch or a tag has no usable `before`; compare with main.
+          if ! git cat-file -e "$BASE^{commit}" 2>/dev/null; then
+            BASE=$(git merge-base origin/main HEAD)
+          fi
+          if git diff --name-only "$BASE" HEAD -- flake.nix flake.lock Cargo.toml Cargo.lock \
+            'crates/*/Cargo.toml' .github/workflows/ci.yml | grep -q .; then
+            echo nix=true >> "$GITHUB_OUTPUT"
+          fi
+
+  # `nix run github:omc/bonsai-cli` builds flake.nix; check it still builds. It
+  # builds every dependency from source, about 8 minutes on a 2-vCPU runner, so it
+  # runs only when the build's inputs change, on main and on release tags.
   nix:
-    needs: [fmt, clippy, deny]
+    needs: [fmt, clippy, deny, changes]
+    if: >-
+      needs.changes.outputs.nix == 'true' ||
+      github.ref == 'refs/heads/main' ||
+      startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v6
