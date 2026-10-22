@@ -208,9 +208,23 @@ fn credentials() {
 #[test]
 fn catalogue() {
     let plan = json!({"id": "standard", "name": "Standard", "price_in_cents": 5000, "billing_interval_months": 1,
-                      "single_tenant": false, "private_network": true, "regions": ["aws-us-east-1"], "releases": ["os"]});
+                      "single_tenant": false, "private_network": true, "regions": ["aws-us-east-1"], "releases": ["os"],
+                      "offers": [{"region": "aws-us-east-1", "releases": ["os"]}]});
     check::<Plan>("Plan", plan.clone());
-    check::<Page<Plan>>("PlanList", json!({"data": [plan], "next_cursor": null}));
+    check::<Page<Plan>>(
+        "PlanList",
+        json!({"data": [plan.clone()], "next_cursor": null}),
+    );
+    check::<PlanOffer>(
+        "PlanOffer",
+        json!({"region": "gcp-us-east4", "releases": ["es-9", "es-8"]}),
+    );
+    let plan: Plan = serde_json::from_value(plan).unwrap();
+    assert_eq!(
+        plan.releases_in("aws-us-east-1"),
+        Some(&["os".to_owned()][..])
+    );
+    assert_eq!(plan.releases_in("gcp-us-east4"), None);
     let region = json!({"id": "aws-us-east-1", "name": "US East", "cloud": "aws", "cloud_region": "us-east-1"});
     check::<Region>("Region", region.clone());
     check::<Page<Region>>("RegionList", json!({"data": [region], "next_cursor": null}));

@@ -1,13 +1,16 @@
 //! Plans, regions, spaces and releases (`listPlans`, `getPlan`, `listRegions`,
 //! `listSpaces`, `listReleases`), plus the queries other routes use to look
-//! them up. Lists are in seed `sort` order.
+//! them up. Lists are in seed `sort` order, except releases, which are in offer
+//! order. A plan's `offers` say where it can be created and with which releases;
+//! the lists hold only what some plan's offers name.
 
+use std::cmp::Reverse;
 use std::collections::BTreeMap;
 
 use axum::extract::{Path, State};
 use axum::routing::get;
 use axum::{Json, Router};
-use bonsai_api::{ClusterLimits, Page, Plan, Region, Release, Space};
+use bonsai_api::{ClusterLimits, Page, Plan, PlanOffer, Region, Release, Space};
 use rusqlite::{Connection, OptionalExtension, Row};
 
 use crate::http::{Auth, Op, PageParams, QueryParams, paginate};
@@ -35,9 +38,6 @@ pub struct PlanRow {
     pub max_credentials: Option<u32>,
     /// `None` when the plan has no limits on record.
     pub limits: Option<ClusterLimits>,
-    /// The releases offered in each region, in offer order. Empty offers every
-    /// release in `plan.releases` in every region in `plan.regions`.
-    pub offers: BTreeMap<String, Vec<String>>,
 }
 
 const PLAN_COLUMNS: &str = "id, name, price_in_cents, billing_interval_months, single_tenant,
@@ -55,6 +55,9 @@ fn plan_row(r: &Row) -> rusqlite::Result<PlanRow> {
         && limits.shards.is_none()
         && limits.bytes.is_none()
         && limits.daily_bandwidth_bytes.is_none();
+    let regions: Vec<String> = db::json(r, 6)?;
+    let releases: Vec<String> = db::json(r, 7)?;
+    let offers = plan_offers(regions, &releases, db::json(r, 15)?);
     Ok(PlanRow {
         plan: Plan {
             id: r.get(0)?,
@@ -63,26 +66,68 @@ fn plan_row(r: &Row) -> rusqlite::Result<PlanRow> {
             billing_interval_months: r.get(3)?,
             single_tenant: r.get(4)?,
             private_network: r.get(5)?,
-            regions: db::json(r, 6)?,
-            releases: db::json(r, 7)?,
+            regions: offers.iter().map(|o| o.region.clone()).collect(),
+            releases,
+            offers,
         },
         tier: r.get(8)?,
         dedicated: r.get(9)?,
         max_credentials: r.get(10)?,
         limits: (!none).then_some(limits),
-        offers: db::json(r, 15)?,
     })
+}
+
+/// A plan's `offers` column as the contract's array, in region order (the
+/// `regions` column, which seeding writes in region `sort` order). An empty
+/// map, from before plans had offers, offers every one of `releases` in every
+/// one of `regions`.
+fn plan_offers(
+    regions: Vec<String>,
+    releases: &[String],
+    mut offers: BTreeMap<String, Vec<String>>,
+) -> Vec<PlanOffer> {
+    if offers.is_empty() {
+        return regions
+            .into_iter()
+            .map(|region| PlanOffer {
+                region,
+                releases: releases.to_vec(),
+            })
+            .collect();
+    }
+    let mut ordered: Vec<PlanOffer> = regions
+        .into_iter()
+        .filter_map(|region| {
+            let releases = offers.remove(&region)?;
+            Some(PlanOffer { region, releases })
+        })
+        .collect();
+    // Any region the `regions` column missed, by ID.
+    ordered.extend(
+        offers
+            .into_iter()
+            .map(|(region, releases)| PlanOffer { region, releases }),
+    );
+    ordered
+}
+
+/// The order releases are offered in: OpenSearch first, then newest first.
+/// Sort by it stably, so releases of one version keep their seed order.
+pub fn offer_order(engine: &str, version: &str) -> (bool, Reverse<Vec<u64>>) {
+    let parts = version.split('.').map(|p| p.parse().unwrap_or(0)).collect();
+    (engine != "opensearch", Reverse(parts))
 }
 
 impl PlanRow {
     /// The releases this plan offers in `region`, in offer order, so the first
     /// is a create's default there. Empty when the plan isn't offered there.
     pub fn releases_in(&self, region: &str) -> &[String] {
-        if self.offers.is_empty() {
-            let offered = self.plan.regions.iter().any(|r| r == region);
-            return if offered { &self.plan.releases } else { &[] };
-        }
-        self.offers.get(region).map_or(&[], Vec::as_slice)
+        self.plan.releases_in(region).unwrap_or(&[])
+    }
+
+    /// Whether the plan can be created anywhere.
+    pub fn is_offered(&self) -> bool {
+        !self.plan.offers.is_empty()
     }
 
     pub fn all(conn: &Connection) -> rusqlite::Result<Vec<PlanRow>> {
@@ -145,6 +190,51 @@ pub fn spaces(conn: &Connection, account_id: &str) -> rusqlite::Result<Vec<Space
     .collect()
 }
 
+/// The plans offered somewhere. Plans don't differ by account here.
+fn offered_plans(conn: &Connection) -> rusqlite::Result<Vec<Plan>> {
+    Ok(PlanRow::all(conn)?
+        .into_iter()
+        .filter(PlanRow::is_offered)
+        .map(|p| p.plan)
+        .collect())
+}
+
+/// Whether some offered plan can be created in `region`.
+fn is_offered_in(plans: &[Plan], region: &str) -> bool {
+    plans.iter().any(|p| p.releases_in(region).is_some())
+}
+
+/// The regions some plan is offered in.
+fn offered_regions(conn: &Connection) -> rusqlite::Result<Vec<Region>> {
+    let plans = offered_plans(conn)?;
+    let mut all = regions(conn)?;
+    all.retain(|r| is_offered_in(&plans, &r.id));
+    Ok(all)
+}
+
+/// The account's private spaces some plan can be placed in: every plan offered
+/// in a space's region can be.
+fn offered_spaces(conn: &Connection, account_id: &str) -> rusqlite::Result<Vec<Space>> {
+    let plans = offered_plans(conn)?;
+    let mut all = spaces(conn, account_id)?;
+    all.retain(|s| is_offered_in(&plans, &s.region));
+    Ok(all)
+}
+
+/// The releases some plan is offered with, in offer order.
+fn offered_releases(conn: &Connection) -> rusqlite::Result<Vec<Release>> {
+    let plans = offered_plans(conn)?;
+    let mut all = releases(conn)?;
+    all.retain(|r| {
+        plans
+            .iter()
+            .flat_map(|p| &p.offers)
+            .any(|o| o.releases.contains(&r.id))
+    });
+    all.sort_by_cached_key(|r| offer_order(r.engine.as_str(), &r.version));
+    Ok(all)
+}
+
 async fn list_plans(
     State(state): State<AppState>,
     auth: Auth,
@@ -152,11 +242,7 @@ async fn list_plans(
 ) -> Result<Json<Page<Plan>>, ProblemBuilder> {
     auth.require(Op::ReadPlans)?;
     let page = PageParams::from_query(&q)?;
-    let plans = state.db(PlanRow::all)?;
-    Ok(Json(paginate(
-        plans.into_iter().map(|p| p.plan).collect(),
-        page,
-    )))
+    Ok(Json(paginate(state.db(offered_plans)?, page)))
 }
 
 async fn show_plan(
@@ -176,7 +262,7 @@ async fn list_regions(
 ) -> Result<Json<Page<Region>>, ProblemBuilder> {
     auth.require(Op::ReadSpaces)?;
     let page = PageParams::from_query(&q)?;
-    Ok(Json(paginate(state.db(regions)?, page)))
+    Ok(Json(paginate(state.db(offered_regions)?, page)))
 }
 
 async fn list_spaces(
@@ -187,7 +273,7 @@ async fn list_spaces(
     auth.require(Op::ReadSpaces)?;
     let page = PageParams::from_query(&q)?;
     Ok(Json(paginate(
-        state.db(|c| spaces(c, &auth.account_id))?,
+        state.db(|c| offered_spaces(c, &auth.account_id))?,
         page,
     )))
 }
@@ -199,5 +285,5 @@ async fn list_releases(
 ) -> Result<Json<Page<Release>>, ProblemBuilder> {
     auth.require(Op::ReadReleases)?;
     let page = PageParams::from_query(&q)?;
-    Ok(Json(paginate(state.db(releases)?, page)))
+    Ok(Json(paginate(state.db(offered_releases)?, page)))
 }

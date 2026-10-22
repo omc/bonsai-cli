@@ -315,7 +315,30 @@ pub struct Plan {
     pub billing_interval_months: u32,
     pub single_tenant: bool,
     pub private_network: bool,
+    /// The regions of `offers`.
     pub regions: Vec<String>,
+    /// Every release of `offers`, in offer order.
+    pub releases: Vec<String>,
+    /// Where the plan can be created, and with which releases in each region.
+    pub offers: Vec<PlanOffer>,
+}
+
+impl Plan {
+    /// The releases this plan offers in `region`, in offer order (the first is
+    /// a create's default), or `None` when it isn't offered there.
+    pub fn releases_in(&self, region: &str) -> Option<&[String]> {
+        self.offers
+            .iter()
+            .find(|o| o.region == region)
+            .map(|o| o.releases.as_slice())
+    }
+}
+
+/// A region a plan can be created in, and the releases offered there.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PlanOffer {
+    pub region: String,
+    /// OpenSearch first, then newest first.
     pub releases: Vec<String>,
 }
 

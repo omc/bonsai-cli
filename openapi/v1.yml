@@ -588,7 +588,7 @@ paths:
       operationId: listPlans
       tags: [catalogue]
       summary: List the plans this account can choose
-      description: Plans differ by account; this lists only the ones this account may use.
+      description: Plans differ by account; this lists the ones this account may use that are offered somewhere.
       x-operation: read_plans
       parameters:
         - $ref: "#/components/parameters/Limit"
@@ -614,7 +614,7 @@ paths:
       operationId: getPlan
       tags: [catalogue]
       summary: Show a plan
-      description: 404 if the plan isn't available to this account.
+      description: 404 if the plan isn't available to this account. A plan offered nowhere is answered, with empty `offers`.
       x-operation: read_plans
       responses:
         "200":
@@ -635,7 +635,7 @@ paths:
       operationId: listRegions
       tags: [catalogue]
       summary: List the regions clusters can be created in
-      description: Only regions accepting new clusters.
+      description: The regions some plan of this account can be created in.
       x-operation: read_spaces
       parameters:
         - $ref: "#/components/parameters/Limit"
@@ -659,7 +659,7 @@ paths:
       operationId: listSpaces
       tags: [catalogue]
       summary: List the account's private spaces
-      description: Empty for accounts without private placement. Shared spaces are not listed; pick a region instead.
+      description: The account's private spaces that some plan can be created in. Empty for accounts without private placement. Shared spaces are not listed; pick a region instead.
       x-operation: read_spaces
       parameters:
         - $ref: "#/components/parameters/Limit"
@@ -683,7 +683,7 @@ paths:
       operationId: listReleases
       tags: [catalogue]
       summary: List the releases this account can choose
-      description: Sorted by engine, then version.
+      description: The releases some plan of this account can be created with, OpenSearch first, then newest first.
       x-operation: read_releases
       parameters:
         - $ref: "#/components/parameters/Limit"
@@ -1035,7 +1035,9 @@ components:
         plan: { type: string, description: Plan ID. }
         region: { type: string, description: "Region ID, e.g. `aws-us-east-1`." }
         space: { type: string, description: Private space ID. Must be in `region`. }
-        release: { type: string, description: Release ID. Defaults to the plan's best fit. }
+        release:
+          type: string
+          description: Release ID, one of the plan's releases in `region` (its `offers`). Defaults to the first of them the space can place.
     ClusterUpdate:
       type: object
       additionalProperties: false
@@ -1262,7 +1264,7 @@ components:
 
     Plan:
       type: object
-      required: [id, name, price_in_cents, billing_interval_months, single_tenant, private_network, regions, releases]
+      required: [id, name, price_in_cents, billing_interval_months, single_tenant, private_network, regions, releases, offers]
       properties:
         id: { type: string }
         name: { type: string }
@@ -1270,8 +1272,21 @@ components:
         billing_interval_months: { type: integer }
         single_tenant: { type: boolean }
         private_network: { type: boolean }
-        regions: { type: array, items: { type: string }, description: Region IDs this plan can use. }
-        releases: { type: array, items: { type: string }, description: Release IDs this plan can use. }
+        regions: { type: array, items: { type: string }, description: "Region IDs this plan can be created in: the regions of `offers`." }
+        releases: { type: array, items: { type: string }, description: "Release IDs this plan can be created with in some region: every release of `offers`, in offer order." }
+        offers:
+          type: array
+          description: Where this plan can be created, and with which releases in each region. Empty when the plan is offered nowhere.
+          items: { $ref: "#/components/schemas/PlanOffer" }
+    PlanOffer:
+      type: object
+      required: [region, releases]
+      properties:
+        region: { type: string, description: Region ID. }
+        releases:
+          type: array
+          items: { type: string }
+          description: Release IDs offered in this region, OpenSearch first, then newest first. A create that names no release gets the first one its space can place.
     PlanList:
       allOf:
         - $ref: "#/components/schemas/PageInfo"
@@ -1313,7 +1328,7 @@ components:
       type: object
       required: [id, name, engine, version]
       properties:
-        id: { type: string, description: "e.g. `opensearch-2.19.0`." }
+        id: { type: string, description: "e.g. `opensearch-3.8.0`." }
         name: { type: string }
         engine: { type: string, x-extensible-enum: [elasticsearch, opensearch] }
         version: { type: string }

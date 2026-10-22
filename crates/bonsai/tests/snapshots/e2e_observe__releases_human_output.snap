@@ -3,13 +3,13 @@ source: crates/bonsai/tests/e2e_observe.rs
 expression: stdout(&out)
 ---
 ID                    ENGINE         VERSION
-elasticsearch-7.2.0   elasticsearch  7.2.0
-elasticsearch-7.10.2  elasticsearch  7.10.2
-elasticsearch-8.17.5  elasticsearch  8.17.5
-elasticsearch-9.4.1   elasticsearch  9.4.1
+opensearch-3.8.0      opensearch     3.8.0
+opensearch-2.19.6     opensearch     2.19.6
+opensearch-2.19.3     opensearch     2.19.3
+opensearch-2.19.2     opensearch     2.19.2
 opensearch-2.6.0-mt   opensearch     2.6.0
 opensearch-2.6.0      opensearch     2.6.0
-opensearch-2.19.2     opensearch     2.19.2
-opensearch-2.19.3     opensearch     2.19.3
-opensearch-2.19.6     opensearch     2.19.6
-opensearch-3.8.0      opensearch     3.8.0
+elasticsearch-9.4.1   elasticsearch  9.4.1
+elasticsearch-8.17.5  elasticsearch  8.17.5
+elasticsearch-7.10.2  elasticsearch  7.10.2
+elasticsearch-7.2.0   elasticsearch  7.2.0

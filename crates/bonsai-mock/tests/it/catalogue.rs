@@ -265,6 +265,10 @@ async fn plan_shapes_and_unknown_plan() {
     assert_eq!(body["price_in_cents"], 0);
     assert_eq!(body["releases"], json!(["opensearch-3.8.0"]));
     assert_eq!(body["regions"], json!(["aws-us-east-1"]));
+    assert_eq!(
+        body["offers"],
+        json!([{"region": "aws-us-east-1", "releases": ["opensearch-3.8.0"]}])
+    );
 
     // Standard is AWS only; its releases are the union over its regions, in
     // offer order: OpenSearch first, then newest.
@@ -289,6 +293,23 @@ async fn plan_shapes_and_unknown_plan() {
             "opensearch-3.8.0",
             "opensearch-2.19.6",
             "elasticsearch-7.10.2"
+        ])
+    );
+    // Its offers, in region order, are what `regions` and `releases` sum up.
+    let wide = json!([
+        "opensearch-3.8.0",
+        "opensearch-2.19.6",
+        "elasticsearch-7.10.2"
+    ]);
+    let narrow = json!(["opensearch-3.8.0", "elasticsearch-7.10.2"]);
+    assert_eq!(
+        body["offers"],
+        json!([
+            {"region": "aws-ap-southeast-2", "releases": narrow},
+            {"region": "aws-eu-central-1", "releases": narrow},
+            {"region": "aws-eu-west-1", "releases": wide},
+            {"region": "aws-us-east-1", "releases": wide},
+            {"region": "aws-us-west-2", "releases": narrow}
         ])
     );
 
@@ -321,21 +342,71 @@ async fn regions_and_releases_in_order() {
         ]
     );
     let (_, _, releases) = m.call("GET", "/releases", Some(&m.globex), None, &[]).await;
+    // Offer order: OpenSearch first, then newest first.
     assert_eq!(
         ids(&releases.unwrap()),
         [
-            "elasticsearch-7.2.0",
-            "elasticsearch-7.10.2",
-            "elasticsearch-8.17.5",
-            "elasticsearch-9.4.1",
+            "opensearch-3.8.0",
+            "opensearch-2.19.6",
+            "opensearch-2.19.3",
+            "opensearch-2.19.2",
             "opensearch-2.6.0-mt",
             "opensearch-2.6.0",
-            "opensearch-2.19.2",
-            "opensearch-2.19.3",
-            "opensearch-2.19.6",
-            "opensearch-3.8.0"
+            "elasticsearch-9.4.1",
+            "elasticsearch-8.17.5",
+            "elasticsearch-7.10.2",
+            "elasticsearch-7.2.0"
         ]
     );
+}
+
+/// The lists hold only what some plan's offers name: a plan offered nowhere
+/// isn't listed (but is still answered by ID), and neither is a region,
+/// space or release no plan is offered in or with.
+#[tokio::test]
+async fn lists_follow_the_offers() {
+    let m = Mock::start().await;
+    m.db()
+        .execute_batch(
+            r#"UPDATE plans SET offers = '{}', regions = '[]', releases = '[]'
+                 WHERE id NOT IN ('business-lg', 'business-lg-esplat');
+               UPDATE plans SET offers = '{"aws-eu-west-1": ["opensearch-2.19.6", "elasticsearch-7.10.2"]}',
+                   regions = '["aws-eu-west-1"]', releases = '["opensearch-2.19.6", "elasticsearch-7.10.2"]'
+                 WHERE id = 'business-lg';
+               UPDATE plans SET offers = '{"aws-eu-west-1": ["elasticsearch-8.17.5"]}',
+                   regions = '["aws-eu-west-1"]', releases = '["elasticsearch-8.17.5"]'
+                 WHERE id = 'business-lg-esplat';"#,
+        )
+        .unwrap();
+
+    let m = &m;
+    let list = |path: &'static str| async move {
+        let (status, _, body) = m.call("GET", path, Some(&m.acme), None, &[]).await;
+        assert_eq!(status, 200, "{path}");
+        ids(&body.unwrap())
+    };
+    assert_eq!(list("/plans").await, ["business-lg", "business-lg-esplat"]);
+    assert_eq!(list("/regions").await, ["aws-eu-west-1"]);
+    // Acme's space is in us-east-1, where nothing is offered now.
+    assert!(list("/spaces").await.is_empty());
+    // In offer order across plans, not in the order plans list them.
+    assert_eq!(
+        list("/releases").await,
+        [
+            "opensearch-2.19.6",
+            "elasticsearch-8.17.5",
+            "elasticsearch-7.10.2"
+        ]
+    );
+
+    let (status, _, body) = m
+        .call("GET", "/plans/sandbox", Some(&m.acme), None, &[])
+        .await;
+    assert_eq!(status, 200);
+    let body = body.unwrap();
+    assert_eq!(body["offers"], json!([]));
+    assert_eq!(body["regions"], json!([]));
+    assert_eq!(body["releases"], json!([]));
 }
 
 #[tokio::test]

@@ -284,6 +284,28 @@ mod tests {
         }
     }
 
+    /// Each plan lists its releases, overall and in each region, in the offer
+    /// order `/releases` sorts by: OpenSearch first, then newest first.
+    #[test]
+    fn plans_list_releases_in_offer_order() {
+        let seed: Seed = serde_json::from_str(SEED).unwrap();
+        let key = |id: &String| {
+            let r = seed.releases.iter().find(|r| &r.id == id).unwrap();
+            crate::routes::catalogue::offer_order(&r.engine, &r.version)
+        };
+        for p in &seed.plans {
+            let lists = std::iter::once(("releases", &p.releases))
+                .chain(p.offers.iter().map(|(region, l)| (region.as_str(), l)));
+            for (what, list) in lists {
+                assert!(
+                    list.windows(2).all(|w| key(&w[0]) <= key(&w[1])),
+                    "{} {what}: {list:?}",
+                    p.id
+                );
+            }
+        }
+    }
+
     #[test]
     fn tokens_store_only_a_hash() {
         let dir = tempfile::tempdir().unwrap();
