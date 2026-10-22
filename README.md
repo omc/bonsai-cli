@@ -80,7 +80,7 @@ bonsai url search --env ELASTICSEARCH_URL >> .env
 | Area | Commands |
 |---|---|
 | Account | `login`, `logout`, `whoami`, `doctor`, `version` |
-| Clusters | `clusters`, `cluster create`, `cluster show`, `cluster rename`, `cluster resize`, `cluster destroy`, `cluster wait`, `history` |
+| Clusters | `clusters`, `cluster create`, `cluster show`, `cluster open`, `cluster rename`, `cluster resize`, `cluster destroy`, `cluster wait`, `history` |
 | Connecting | `url` |
 | Watching | `usage`, `metrics`, `queries` |
 | Actions | `action show`, `wait` |

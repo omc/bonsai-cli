@@ -19,6 +19,7 @@ pub const COVERAGE: &[(&str, &[&str])] = &[
             "clusters",
             "cluster list",
             "cluster show",
+            "cluster open",
             "cluster rename",
             "cluster resize",
             "cluster destroy",
@@ -36,6 +37,7 @@ pub const COVERAGE: &[(&str, &[&str])] = &[
         "getCluster",
         &[
             "cluster show",
+            "cluster open",
             "cluster rename",
             "cluster resize",
             "cluster destroy",

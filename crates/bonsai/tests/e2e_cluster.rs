@@ -568,6 +568,35 @@ async fn url_prints_the_default_credentials_unless_another_is_named() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn cluster_open_prints_the_dashboard_link() {
+    let env = Env::start().await;
+    let id = create(&env, "open-me", "sandbox");
+    let shown = env
+        .authed()
+        .args(["cluster", "show", &id, "--json"])
+        .output()
+        .unwrap();
+    let link = stdout_json(&shown)["dashboard_url"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    assert!(link.ends_with(&format!("/_mock/clusters/{id}")), "{link}");
+
+    // Prompts are off in tests, so it's printed, never opened.
+    env.authed()
+        .args(["cluster", "open", "open-me"])
+        .assert()
+        .success()
+        .stdout(format!("{link}\n"));
+    let out = env
+        .authed()
+        .args(["cluster", "open", &id, "--json"])
+        .output()
+        .unwrap();
+    assert_eq!(stdout_json(&out)["dashboard_url"], link.as_str());
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn bonsai_cluster_is_the_default_cluster() {
     let env = Env::start().await;
     let id = create(&env, "default-one", "sandbox");

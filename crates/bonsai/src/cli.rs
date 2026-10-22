@@ -167,6 +167,8 @@ pub enum ClusterCommand {
     Create(CreateArgs),
     /// A cluster's state, plan, host, usage and latest Action
     Show(ClusterArg),
+    /// Open a cluster's page in the dashboard
+    Open(OpenArgs),
     /// Rename a cluster
     Rename(RenameArgs),
     /// Change a cluster's plan
@@ -204,6 +206,15 @@ pub struct CreateArgs {
     pub idempotency_key: Option<String>,
     #[command(flatten)]
     pub wait: WaitFlags,
+}
+
+#[derive(Debug, Args)]
+pub struct OpenArgs {
+    #[command(flatten)]
+    pub cluster: ClusterArg,
+    /// Print the link instead of opening it
+    #[arg(long)]
+    pub no_browser: bool,
 }
 
 #[derive(Debug, Args)]

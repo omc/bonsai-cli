@@ -21,7 +21,7 @@ use url::Url;
 use super::{Authed, Ctx};
 use crate::cli::{
     ClusterArg, ClusterCommand, ClusterListArgs, ClusterWaitArgs, CreateArgs, DestroyArgs,
-    HistoryArgs, RenameArgs, ResizeArgs, WaitFlags, WaitFor,
+    HistoryArgs, OpenArgs, RenameArgs, ResizeArgs, WaitFlags, WaitFor,
 };
 use crate::display::plan_price;
 use crate::exit::{Failed, Hint, Interrupted, TimedOut};
@@ -75,6 +75,7 @@ pub async fn run(ctx: &Ctx, command: ClusterCommand) -> Result<()> {
             create(ctx, args, key).await
         }
         ClusterCommand::Show(args) => show(ctx, args).await,
+        ClusterCommand::Open(args) => open(ctx, args).await,
         ClusterCommand::Rename(args) => rename(ctx, args).await,
         ClusterCommand::Resize(mut args) => {
             let key = args.idempotency_key.take();
@@ -556,6 +557,34 @@ async fn show(ctx: &Ctx, args: ClusterArg) -> Result<()> {
     ctx.out.kv(&show_rows(&cluster.value, Timestamp::now()))
 }
 
+/// Prints the cluster's dashboard link, and opens it on a terminal unless
+/// `--no-browser`: only on Bonsai's hosts, as any link the API hands out.
+async fn open(ctx: &Ctx, args: OpenArgs) -> Result<()> {
+    let settings = ctx.settings()?;
+    let a = ctx.authed().await?;
+    let cluster = resolve(ctx, &a.client, &args.cluster.cluster).await?.value;
+    let url = cluster.dashboard_url;
+    if ctx.out.is_json() {
+        ctx.out.json(&serde_json::json!({ "dashboard_url": url }))?;
+    } else {
+        ctx.out.data_line(&sanitize(&url, false))?;
+    }
+    if args.no_browser || !ctx.interactive {
+        return Ok(());
+    }
+    let allowed = Url::parse(&url)
+        .is_ok_and(|u| may_open(&u, &settings.api_url, settings.dashboard_url.as_ref()));
+    if !allowed {
+        ctx.out
+            .warn("Not opening that link: it isn't on Bonsai's host. Check it before you use it.");
+    } else if let Err(e) = open::that_detached(&url) {
+        ctx.out.warn(&format!(
+            "Couldn't open a browser ({e}); open the link above"
+        ));
+    }
+    Ok(())
+}
+
 async fn rename(ctx: &Ctx, args: RenameArgs) -> Result<()> {
     let a = ctx.authed().await?;
     let cluster = resolve(ctx, &a.client, &args.cluster).await?.value;
@@ -933,7 +962,7 @@ mod tests {
             "host": null, "port": 443,
             "stats": {"docs": null, "shards": null, "bytes": null, "polled_at": null, "limits": null},
             "latest_action": latest.map(|(id, state)| json!({"id": id, "type": "cluster.provision", "state": state})),
-            "created_at": "2026-10-20T12:00:00Z", "terminated_at": null
+            "dashboard_url": "https://app.bonsai.io/accounts/acme/clusters/c", "created_at": "2026-10-20T12:00:00Z", "terminated_at": null
         }))
         .unwrap()
     }
