@@ -7,6 +7,9 @@ use url::Url;
 use crate::{ConfigError, Result};
 
 pub const DEFAULT_API_URL: &str = "https://api.bonsai.io/v1";
+/// The dashboard for [`DEFAULT_API_URL`]'s host, which serves the browser login,
+/// the API Tokens page and each cluster's page.
+pub const DEFAULT_DASHBOARD_URL: &str = "https://app.bonsai.io";
 const CONFIG_FILE: &str = "config.toml";
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
@@ -54,6 +57,8 @@ pub struct Settings {
     /// The profile's own URL (or the default when it has none), which a stored
     /// token belongs to (see [`crate::auth::check_token_host`]).
     pub profile_api_url: Url,
+    /// The profile's `dashboard_url`, or [`DEFAULT_DASHBOARD_URL`] when this run
+    /// talks to [`DEFAULT_API_URL`]'s host.
     pub dashboard_url: Option<Url>,
 }
 
@@ -104,7 +109,11 @@ pub fn resolve_settings_with(
         None => profile_api_url.clone(),
     };
     check_api_url(&api_url)?;
-    let dashboard_url = stored.and_then(|p| p.dashboard_url.clone());
+    let default_host = Url::parse(DEFAULT_API_URL).expect("default API URL parses");
+    let dashboard_url = stored.and_then(|p| p.dashboard_url.clone()).or_else(|| {
+        (api_url.host_str() == default_host.host_str())
+            .then(|| Url::parse(DEFAULT_DASHBOARD_URL).expect("default dashboard URL parses"))
+    });
     Ok(Settings {
         profile,
         api_url,

@@ -157,6 +157,30 @@ fn settings_precedence() {
     assert_eq!(s.api_url.as_str(), "https://e.example/v1");
 }
 
+/// The default API's dashboard is known without a profile, so its links (the
+/// browser login, `cluster open`) may be opened; another host's only when its
+/// profile names one.
+#[test]
+fn the_default_api_knows_its_dashboard() {
+    let d = tempfile::tempdir().unwrap();
+    let none = env_of(&[]);
+
+    let s = resolve_settings_with(&none, d.path(), None, None).unwrap();
+    assert_eq!(
+        s.dashboard_url.as_ref().map(Url::as_str),
+        Some("https://app.bonsai.io/")
+    );
+
+    let s = resolve_settings_with(
+        &none,
+        d.path(),
+        None,
+        Some("https://api.staging.example/v1"),
+    )
+    .unwrap();
+    assert_eq!(s.dashboard_url, None);
+}
+
 /// A stored token is bound to its profile's host: an `--api-url` or
 /// `BONSAI_API_URL` on another host or port is refused before any request.
 #[test]
