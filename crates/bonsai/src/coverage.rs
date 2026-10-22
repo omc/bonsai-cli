@@ -7,6 +7,9 @@
 pub const COVERAGE: &[(&str, &[&str])] = &[
     ("getApiRoot", &["doctor", "version"]),
     ("getAccount", &["login", "whoami", "doctor"]),
+    // `login` reads a pasted token's expiry.
+    ("getToken", &["login", "whoami"]),
+    ("revokeToken", &["logout"]),
     // Every command that takes a CLUSTER resolves it: getCluster by ID, then
     // listClusters by name (bonsai-core's resolve_cluster).
     (

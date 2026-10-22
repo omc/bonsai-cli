@@ -6,6 +6,7 @@ Account     Acme Search (acme)
 Profile     default
 API         http://127.0.0.1:PORT/v1
 Token       env (BONSAI_TOKEN)
+Token key   KEY
 Token name  Seed token
 Scopes      account:read, clusters:read, clusters:write, credentials:read, credentials:write, query_logs:read
 Expires     never

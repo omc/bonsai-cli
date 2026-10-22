@@ -94,6 +94,37 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "429": { $ref: "#/components/responses/RateLimited" }
 
+  /token:
+    get:
+      operationId: getToken
+      tags: [account]
+      summary: Show the calling token
+      description: Its key, scopes and expiry. Needs no scope; a token only ever reaches itself.
+      responses:
+        "200":
+          description: The token.
+          headers:
+            RateLimit: { $ref: "#/components/headers/RateLimit" }
+            RateLimit-Policy: { $ref: "#/components/headers/RateLimitPolicy" }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Token" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+    delete:
+      operationId: revokeToken
+      tags: [account]
+      summary: Revoke the calling token
+      description: As revoking it in the dashboard does. Needs no scope; a token only ever reaches itself. Every later request with it is a `401`.
+      responses:
+        "204":
+          description: Revoked.
+          headers:
+            RateLimit: { $ref: "#/components/headers/RateLimit" }
+            RateLimit-Policy: { $ref: "#/components/headers/RateLimitPolicy" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
   /clusters:
     get:
       operationId: listClusters
@@ -893,6 +924,20 @@ components:
           type: string
           nullable: true
           description: When set, the only address that gets cluster notifications and billing email. null to use the default.
+        created_at: { type: string, format: date-time }
+
+    Token:
+      type: object
+      required: [key, name, account, scopes, expires_at, created_at]
+      properties:
+        key: { type: string, description: "The token's public half: `<key>` in `bonsai_<key>_<secret>`. The dashboard lists tokens by it." }
+        name:
+          type: string
+          nullable: true
+          description: "`Bonsai CLI on <hostname>` for a token a browser login made; null for one made in the dashboard."
+        account: { $ref: "#/components/schemas/Ref" }
+        scopes: { type: array, items: { type: string } }
+        expires_at: { type: string, format: date-time, nullable: true, description: null for a token that never expires. }
         created_at: { type: string, format: date-time }
 
     Problem:

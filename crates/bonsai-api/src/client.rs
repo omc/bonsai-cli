@@ -367,10 +367,11 @@ impl Client {
         self.get(&["releases"], &cursor_query(cursor)).await
     }
 
-    // Proposed, not in v1.yml. A 404 means the server doesn't have the endpoint yet.
+    // The calling token; neither needs a scope. A 404 means a server older than
+    // these endpoints.
 
     /// `GET /token`. `None` when the server doesn't offer it.
-    pub async fn get_token(&self) -> std::result::Result<Option<Response<TokenInfo>>, ApiError> {
+    pub async fn get_token(&self) -> std::result::Result<Option<Response<Token>>, ApiError> {
         none_on_404(self.get(&["token"], &[]).await)
     }
 

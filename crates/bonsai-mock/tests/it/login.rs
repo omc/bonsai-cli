@@ -1,7 +1,6 @@
-//! The browser login (`POST /v1/cli/logins`, `POST /v1/cli/logins/token`,
-//! checked against the contract through `Mock::call`, and the approval page),
-//! and the proposed `GET`/`DELETE /v1/token`, which `v1.yml` doesn't have yet,
-//! so these tests check them by hand through `Mock::call_unchecked`.
+//! The browser login (`POST /v1/cli/logins`, `POST /v1/cli/logins/token`, and
+//! the approval page), and `GET`/`DELETE /v1/token`, all checked against the
+//! contract through `Mock::call`.
 
 use crate::common::{Mock, header};
 use bonsai_mock::seed;
@@ -187,9 +186,7 @@ async fn full_flow_pending_slow_down_approved_then_spent() {
     let (status, _, account) = m.call("GET", "/account", Some(&token), None, &[]).await;
     assert_eq!(status, 200);
     assert_eq!(account.unwrap()["id"], "acme");
-    let (status, _, info) = m
-        .call_unchecked("GET", "/token", Some(&token), None, &[])
-        .await;
+    let (status, _, info) = m.call("GET", "/token", Some(&token), None, &[]).await;
     assert_eq!(status, 200);
     assert_eq!(info.unwrap()["name"], "Bonsai CLI on build-box");
 
@@ -561,9 +558,7 @@ async fn the_page_form_is_checked() {
 #[tokio::test]
 async fn token_shows_itself() {
     let m = Mock::start().await;
-    let (status, h, body) = m
-        .call_unchecked("GET", "/token", Some(&m.acme), None, &[])
-        .await;
+    let (status, h, body) = m.call("GET", "/token", Some(&m.acme), None, &[]).await;
     assert_eq!(status, 200);
     assert!(header(&h, "ratelimit").is_some());
     let key = m
@@ -573,17 +568,30 @@ async fn token_shows_itself() {
         .split('_')
         .next()
         .unwrap();
+    let mut body = body.unwrap();
+    let created: Timestamp = body["created_at"].as_str().unwrap().parse().unwrap();
+    assert!(created.duration_until(Timestamp::now()).abs() < SignedDuration::from_mins(1));
+    body.as_object_mut().unwrap().remove("created_at");
     assert_eq!(
-        body.unwrap(),
+        body,
         json!({
+            "key": key,
             "name": "Seed token",
+            "account": {"id": "acme", "name": "Acme Search"},
             "scopes": seed::ALL_SCOPES,
             "expires_at": null,
-            "key_prefix": key,
         })
     );
 
-    let (status, h, problem) = m.call_unchecked("GET", "/token", None, None, &[]).await;
+    // No scope needed.
+    let bare = m.token("globex", &[]);
+    let (status, _, body) = m.call("GET", "/token", Some(&bare), None, &[]).await;
+    assert_eq!(status, 200);
+    let body = body.unwrap();
+    assert_eq!(body["account"]["id"], "globex");
+    assert_eq!(body["scopes"], json!([]));
+
+    let (status, h, problem) = m.call("GET", "/token", None, None, &[]).await;
     assert_eq!(status, 401);
     assert!(header(&h, "www-authenticate").is_some());
     assert_eq!(problem.unwrap()["code"], "unauthorized");
@@ -592,21 +600,15 @@ async fn token_shows_itself() {
 #[tokio::test]
 async fn token_deletes_itself() {
     let m = Mock::start().await;
-    let (status, _, body) = m
-        .call_unchecked("DELETE", "/token", Some(&m.globex), None, &[])
-        .await;
+    let (status, _, body) = m.call("DELETE", "/token", Some(&m.globex), None, &[]).await;
     assert_eq!(status, 204);
     assert_eq!(body, None);
 
     let (status, _, _) = m.call("GET", "/account", Some(&m.globex), None, &[]).await;
     assert_eq!(status, 401);
-    let (status, _, _) = m
-        .call_unchecked("GET", "/token", Some(&m.globex), None, &[])
-        .await;
+    let (status, _, _) = m.call("GET", "/token", Some(&m.globex), None, &[]).await;
     assert_eq!(status, 401);
-    let (status, _, _) = m
-        .call_unchecked("DELETE", "/token", Some(&m.globex), None, &[])
-        .await;
+    let (status, _, _) = m.call("DELETE", "/token", Some(&m.globex), None, &[]).await;
     assert_eq!(status, 401);
 
     // Only the calling token.

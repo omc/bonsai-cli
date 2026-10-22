@@ -16,7 +16,7 @@
 //! `429 rate_limited` with `Retry-After: 1`. It fires in the rate-limit layer,
 //! before the token is checked, so every request that matches a `/v1` route
 //! takes one, whatever its token and method: the root, the login endpoints,
-//! the proposed token endpoints, and a wrong method (which would otherwise be a 404). An
+//! and a wrong method (which would otherwise be a 404). An
 //! unknown `/v1` path, `/v1/openapi.json` and everything under `/_mock` don't.
 
 use std::collections::BTreeMap;

@@ -454,7 +454,10 @@ pub async fn whoami(ctx: &Ctx) -> Result<()> {
     ];
     if let Some(t) = token {
         let t = t.value;
-        rows.push(("Token name", t.name));
+        rows.push(("Token key", t.key));
+        if let Some(name) = t.name {
+            rows.push(("Token name", name));
+        }
         rows.push(("Scopes", t.scopes.join(", ")));
         rows.push((
             "Expires",

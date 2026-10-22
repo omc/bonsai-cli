@@ -367,6 +367,25 @@ async fn drive_login(m: &Mock) {
     }
 }
 
+/// The calling token, on a token of its own with no scopes (neither operation
+/// needs one, so neither has a 403): each 429 and 401, the read (200), then the
+/// revoke (204), after which the token answers 401.
+async fn drive_token(m: &Mock) {
+    let token = m.token("acme", &[]);
+    let t = Some(token.as_str());
+    for method in ["GET", "DELETE"] {
+        m.admin("PUT", "/scenario/rate_limit_next", Some(json!(1)))
+            .await;
+        expect(m, t, method, "/token", None, 429).await;
+        m.admin("DELETE", "/rate_limits", None).await;
+        expect(m, None, method, "/token", None, 401).await;
+    }
+    expect(m, t, "GET", "/token", None, 200).await;
+    expect(m, t, "DELETE", "/token", None, 204).await;
+    expect(m, t, "GET", "/token", None, 401).await;
+    expect(m, t, "DELETE", "/token", None, 401).await;
+}
+
 /// What needs an Action still running: `409 action_in_progress`.
 async fn drive_slow(m: &Mock) {
     let acme = Some(m.acme.as_str());
@@ -396,12 +415,13 @@ async fn every_operation_and_documented_status() {
     let slow = Mock::start_with(60_000).await;
     drive(&m).await;
     drive_login(&m).await;
+    drive_token(&m).await;
     drive_slow(&slow).await;
     let mut seen = m.seen();
     seen.extend(slow.seen());
 
     let ops = m.contract.operations();
-    assert_eq!(ops.len(), 24);
+    assert_eq!(ops.len(), 26);
 
     let gap = |id: &str, status: u16| {
         ALLOWED_GAPS

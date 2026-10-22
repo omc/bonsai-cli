@@ -1137,7 +1137,7 @@ async fn collect_pages_refuses_a_cursor_cycle() {
 }
 
 #[tokio::test]
-async fn proposed_endpoints_404_is_none() {
+async fn token_endpoints_404_is_none_on_an_older_server() {
     let server = MockServer::start().await;
     Mock::given(path("/v1/token"))
         .respond_with(problem_response(404, "not_found"))
@@ -1153,8 +1153,10 @@ async fn proposed_endpoints_404_is_none() {
 async fn token_endpoints_when_present() {
     let server = MockServer::start().await;
     let info = json!({
-        "name": "Bonsai CLI on laptop", "scopes": ["account:read", "clusters:read"],
-        "expires_at": "2027-01-01T00:00:00Z", "key_prefix": "abcd1234"
+        "key": "abcd1234", "name": "Bonsai CLI on laptop",
+        "account": {"id": "acme", "name": "Acme Search"},
+        "scopes": ["account:read", "clusters:read"],
+        "expires_at": "2027-01-01T00:00:00Z", "created_at": "2026-10-01T00:00:00Z"
     });
     Mock::given(method("GET"))
         .and(path("/v1/token"))
@@ -1169,7 +1171,9 @@ async fn token_endpoints_when_present() {
 
     let c = client(&server);
     let info = c.get_token().await.unwrap().unwrap().value;
-    assert_eq!(info.key_prefix, "abcd1234");
+    assert_eq!(info.key, "abcd1234");
+    assert_eq!(info.name.as_deref(), Some("Bonsai CLI on laptop"));
+    assert_eq!(info.account.id, "acme");
     assert_eq!(info.scopes, vec!["account:read", "clusters:read"]);
     assert_eq!(c.revoke_token().await.unwrap(), Some(()));
 }

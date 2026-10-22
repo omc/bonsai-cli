@@ -366,16 +366,21 @@ pub struct Release {
     pub version: String,
 }
 
-// Proposed, not in v1.yml yet: reading and revoking the calling token.
-
 /// `GET /token`: the calling token's own details.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct TokenInfo {
-    pub name: String,
+pub struct Token {
+    /// The token's public half: `<key>` in `bonsai_<key>_<secret>`.
+    pub key: String,
+    /// `Bonsai CLI on <hostname>` for a token a browser login made; `None` for one
+    /// made in the dashboard.
+    #[serde(deserialize_with = "required_nullable")]
+    pub name: Option<String>,
+    pub account: Ref,
     pub scopes: Vec<String>,
-    #[serde(default)]
+    /// `None` for a token that never expires.
+    #[serde(deserialize_with = "required_nullable")]
     pub expires_at: Option<Timestamp>,
-    pub key_prefix: String,
+    pub created_at: Timestamp,
 }
 
 // The browser login.

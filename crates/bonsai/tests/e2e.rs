@@ -58,7 +58,14 @@ async fn whoami_human_output() {
     let out = env.authed().arg("whoami").output().unwrap();
     assert!(out.status.success());
     let stdout = String::from_utf8(out.stdout).unwrap();
-    insta::with_settings!({filters => vec![(r"127\.0\.0\.1:\d+", "127.0.0.1:PORT")]}, {
+    // The token's own key: `<key>` in `bonsai_<key>_<secret>`.
+    let token = env.token();
+    let key = token.split('_').nth(1).unwrap();
+    assert!(stdout.contains(key), "{stdout}");
+    insta::with_settings!({filters => vec![
+        (r"127\.0\.0\.1:\d+", "127.0.0.1:PORT"),
+        (key, "KEY"),
+    ]}, {
         insta::assert_snapshot!(stdout);
     });
 }

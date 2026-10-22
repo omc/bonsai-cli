@@ -86,6 +86,27 @@ fn account() {
 }
 
 #[test]
+fn token() {
+    check::<Token>(
+        "Token",
+        json!({"key": "abcd1234", "name": "Bonsai CLI on laptop", "account": rf("acme"),
+               "scopes": ["account:read"], "expires_at": T, "created_at": T}),
+    );
+    check::<Token>(
+        "Token",
+        json!({"key": "abcd1234", "name": null, "account": rf("acme"),
+               "scopes": [], "expires_at": null, "created_at": T}),
+    );
+    // Nullable, but required.
+    for field in ["name", "expires_at"] {
+        let mut t = json!({"key": "k", "name": null, "account": rf("acme"),
+                           "scopes": [], "expires_at": null, "created_at": T});
+        t.as_object_mut().unwrap().remove(field);
+        assert!(serde_json::from_value::<Token>(t).is_err(), "{field}");
+    }
+}
+
+#[test]
 fn problem() {
     check::<Problem>(
         "Problem",
