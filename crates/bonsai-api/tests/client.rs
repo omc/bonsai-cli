@@ -102,36 +102,45 @@ fn fixture(name: &str) -> std::path::PathBuf {
         .join(name)
 }
 
-/// Counts request attempts through the `attempt` field each one logs. Only sees
-/// events on this thread, which is the test's (`#[tokio::test]` is current-thread).
-struct Attempts {
-    count: Arc<AtomicUsize>,
-    _guard: tracing::subscriber::DefaultGuard,
+/// Counts request attempts through the `attempt` field each one logs, on this
+/// thread, which is the test's (`#[tokio::test]` is current-thread).
+///
+/// One global subscriber, installed once, rather than a `set_default` per test:
+/// tracing caches the max level and each callsite's interest globally, and
+/// rebuilds them from the subscribers alive at that moment. With tests on
+/// parallel threads each adding and dropping their own, a rebuild racing this
+/// test's could leave its `debug!` events disabled, and the count at 0.
+struct Attempts;
+
+thread_local! {
+    static ATTEMPTS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
 }
 
 impl Attempts {
     fn install() -> Self {
         use tracing_subscriber::layer::SubscriberExt;
-        let count = Arc::new(AtomicUsize::new(0));
-        let layer = AttemptLayer(count.clone());
-        let guard = tracing::subscriber::set_default(tracing_subscriber::registry().with(layer));
-        Self {
-            count,
-            _guard: guard,
-        }
+        static GLOBAL: std::sync::Once = std::sync::Once::new();
+        GLOBAL.call_once(|| {
+            tracing::subscriber::set_global_default(
+                tracing_subscriber::registry().with(AttemptLayer),
+            )
+            .expect("no other global subscriber in this test binary");
+        });
+        ATTEMPTS.with(|count| count.set(0));
+        Self
     }
 
     fn count(&self) -> usize {
-        self.count.load(Ordering::SeqCst)
+        ATTEMPTS.with(std::cell::Cell::get)
     }
 }
 
-struct AttemptLayer(Arc<AtomicUsize>);
+struct AttemptLayer;
 
 impl<S: tracing::Subscriber> tracing_subscriber::Layer<S> for AttemptLayer {
     fn on_event(&self, event: &tracing::Event<'_>, _: tracing_subscriber::layer::Context<'_, S>) {
         if event.metadata().fields().field("attempt").is_some() {
-            self.0.fetch_add(1, Ordering::SeqCst);
+            ATTEMPTS.with(|count| count.set(count.get() + 1));
         }
     }
 }
