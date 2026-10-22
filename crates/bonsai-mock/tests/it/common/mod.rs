@@ -123,8 +123,8 @@ impl Mock {
     }
 
     /// Calls the mock without checking the response against the contract,
-    /// for what `v1.yml` doesn't describe: the proposed login and token
-    /// endpoints, `/v1/openapi.json`, `/_mock/*`, a wrong method. A path
+    /// for what `v1.yml` doesn't describe: the proposed token endpoints,
+    /// `/v1/openapi.json`, `/_mock/*`, a wrong method. A path
     /// starting with `/_` is used as is; otherwise as in [`Mock::call`]. The
     /// body is parsed as JSON when there is one and it parses.
     pub async fn call_unchecked(

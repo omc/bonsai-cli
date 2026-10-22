@@ -45,6 +45,15 @@ tags:
       in the same lists.
   - { name: credentials, description: Connection credentials for a cluster. }
   - { name: catalogue, description: "Plans, regions, spaces and releases." }
+  - name: login
+    description: |
+      How `bonsai login` gets a token through the browser, in the shape of the
+      OAuth 2.0 Device Authorization Grant (RFC 8628). Start a login, show the
+      person `user_code` and `verification_uri_complete`, and poll
+      `POST /cli/logins/token` every `interval` seconds. The person logs in to
+      the dashboard, compares the code, and picks the account, scopes and
+      expiry. The poll after they approve returns a new API token, once.
+      Neither operation takes a token.
 
 paths:
   /:
@@ -693,6 +702,65 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "429": { $ref: "#/components/responses/RateLimited" }
 
+  /cli/logins:
+    post:
+      operationId: startCliLogin
+      tags: [login]
+      summary: Start a browser login
+      description: Needs no token. Rate-limited to 10 logins a minute per IP address. The login expires after `expires_in` seconds.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CliLoginStart" }
+      responses:
+        "200":
+          description: The codes to show and poll with.
+          headers:
+            RateLimit: { $ref: "#/components/headers/RateLimit" }
+            RateLimit-Policy: { $ref: "#/components/headers/RateLimitPolicy" }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CliLoginGrant" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+  /cli/logins/token:
+    post:
+      operationId: pollCliLogin
+      tags: [login]
+      summary: Collect a browser login's token
+      description: |
+        Needs no token; rate-limited to 60 polls a minute per IP address. Until
+        the person approves, answers `400` with the RFC
+        8628 error as `code`: `authorization_pending` (poll again after
+        `interval`), `slow_down` (polled too soon: wait 5 seconds longer from
+        now on), `access_denied` (the person denied it) or `expired_token`
+        (expired, already collected, or unknown: start a new login). Once
+        approved, the next poll returns the token and the login is spent.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CliLoginPoll" }
+      responses:
+        "200":
+          description: The new API token. It is never shown again.
+          headers:
+            RateLimit: { $ref: "#/components/headers/RateLimit" }
+            RateLimit-Policy: { $ref: "#/components/headers/RateLimitPolicy" }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CliLoginToken" }
+        "400":
+          description: Not approved yet, denied, expired, or a malformed body (`authorization_pending`, `slow_down`, `access_denied`, `expired_token`, `invalid_json`, `body_required`, `invalid_parameter`).
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
 components:
   securitySchemes:
     bearer:
@@ -861,6 +929,10 @@ components:
             - idempotency_replay_unavailable
             - metrics_unavailable
             - internal_error
+            - authorization_pending
+            - slow_down
+            - access_denied
+            - expired_token
         detail: { type: string }
         instance: { type: string, nullable: true }
         action_url:
@@ -1252,3 +1324,43 @@ components:
           required: [data]
           properties:
             data: { type: array, items: { $ref: "#/components/schemas/Release" } }
+
+    CliLoginStart:
+      type: object
+      required: [client_name, hostname, os]
+      additionalProperties: false
+      description: Shown to the person approving, so they can recognise the login.
+      properties:
+        client_name: { type: string, minLength: 1, maxLength: 255, example: "bonsai 0.1.0" }
+        hostname: { type: string, minLength: 1, maxLength: 255, example: "ada-laptop" }
+        os: { type: string, minLength: 1, maxLength: 255, example: "macos aarch64" }
+
+    CliLoginGrant:
+      type: object
+      required: [device_code, user_code, verification_uri, verification_uri_complete, expires_in, interval]
+      properties:
+        device_code: { type: string, description: The secret to poll with. Never show it. }
+        user_code: { type: string, pattern: "^[A-Z]{4}-[A-Z]{4}$", example: "WDJB-MJHT", description: The code the person compares in the browser. }
+        verification_uri: { type: string, format: uri, description: Where the person types the code. }
+        verification_uri_complete: { type: string, format: uri, description: "`verification_uri` with the code filled in. Open this one." }
+        expires_in: { type: integer, minimum: 1, description: Seconds until the login expires. }
+        interval: { type: integer, minimum: 1, description: Seconds to wait between polls. }
+
+    CliLoginPoll:
+      type: object
+      required: [device_code]
+      additionalProperties: false
+      properties:
+        device_code: { type: string }
+
+    CliLoginToken:
+      type: object
+      required: [token, account, scopes, expires_at]
+      properties:
+        token: { type: string, description: "The new API token, `bonsai_<key>_<secret>`. Shown once.", example: "bonsai_0123abcd_<secret>" }
+        account: { $ref: "#/components/schemas/Ref" }
+        scopes:
+          type: array
+          items: { type: string }
+          description: The scopes the person granted.
+        expires_at: { type: string, format: date-time, nullable: true, description: When the token stops working. }

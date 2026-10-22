@@ -309,6 +309,64 @@ async fn drive(m: &Mock) {
         .await;
 }
 
+/// The browser login, which takes no token: start one, poll it pending (400),
+/// approve it and collect the token (200), then each one's 400 and 429.
+async fn drive_login(m: &Mock) {
+    let start = json!({"client_name": "bonsai 0.1.0", "hostname": "covered", "os": "linux"});
+    let (status, _, grant) = m
+        .call("POST", "/cli/logins", None, Some(start.clone()), &[])
+        .await;
+    assert_eq!(status, 200);
+    let grant = grant.unwrap();
+    let poll = json!({"device_code": grant["device_code"]});
+    expect(
+        m,
+        None,
+        "POST",
+        "/cli/logins/token",
+        Some(poll.clone()),
+        400,
+    )
+    .await;
+    let (status, _) = m
+        .admin(
+            "POST",
+            &format!(
+                "/cli/logins/{}/approve",
+                grant["user_code"].as_str().unwrap()
+            ),
+            Some(json!({})),
+        )
+        .await;
+    assert_eq!(status, 204);
+    expect(
+        m,
+        None,
+        "POST",
+        "/cli/logins/token",
+        Some(poll.clone()),
+        200,
+    )
+    .await;
+
+    expect(
+        m,
+        None,
+        "POST",
+        "/cli/logins",
+        Some(json!({"os": "x"})),
+        400,
+    )
+    .await;
+    expect(m, None, "POST", "/cli/logins/token", Some(json!({})), 400).await;
+
+    for (path, body) in [("/cli/logins", start), ("/cli/logins/token", poll)] {
+        m.admin("PUT", "/scenario/rate_limit_next", Some(json!(1)))
+            .await;
+        expect(m, None, "POST", path, Some(body), 429).await;
+    }
+}
+
 /// What needs an Action still running: `409 action_in_progress`.
 async fn drive_slow(m: &Mock) {
     let acme = Some(m.acme.as_str());
@@ -337,12 +395,13 @@ async fn every_operation_and_documented_status() {
     let m = Mock::start().await;
     let slow = Mock::start_with(60_000).await;
     drive(&m).await;
+    drive_login(&m).await;
     drive_slow(&slow).await;
     let mut seen = m.seen();
     seen.extend(slow.seen());
 
     let ops = m.contract.operations();
-    assert_eq!(ops.len(), 22);
+    assert_eq!(ops.len(), 24);
 
     let gap = |id: &str, status: u16| {
         ALLOWED_GAPS

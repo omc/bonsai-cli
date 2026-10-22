@@ -1,7 +1,7 @@
-//! The proposed endpoints `v1.yml` doesn't have yet: the browser login (`POST /v1/cli/logins`, `POST
-//! /v1/cli/logins/token`, the approval page) and `GET`/`DELETE /v1/token`.
-//! They aren't in the contract, so these tests check them by hand through
-//! `Mock::call_unchecked`.
+//! The browser login (`POST /v1/cli/logins`, `POST /v1/cli/logins/token`,
+//! checked against the contract through `Mock::call`, and the approval page),
+//! and the proposed `GET`/`DELETE /v1/token`, which `v1.yml` doesn't have yet,
+//! so these tests check them by hand through `Mock::call_unchecked`.
 
 use crate::common::{Mock, header};
 use bonsai_mock::seed;
@@ -23,17 +23,18 @@ fn start_body(hostname: &str) -> Value {
 /// Starts a login, asserting the 200, and returns the grant.
 async fn start(m: &Mock, hostname: &str) -> Value {
     let (status, h, body) = m
-        .call_unchecked("POST", "/cli/logins", None, Some(start_body(hostname)), &[])
+        .call("POST", "/cli/logins", None, Some(start_body(hostname)), &[])
         .await;
     let body = body.unwrap();
     assert_eq!(status, 200, "{body}");
     assert!(header(&h, "ratelimit").is_some());
+    assert!(header(&h, "ratelimit-policy").is_some());
     body
 }
 
 async fn poll(m: &Mock, device_code: &str) -> (u16, Value) {
     let (status, h, body) = m
-        .call_unchecked(
+        .call(
             "POST",
             "/cli/logins/token",
             None,
@@ -41,7 +42,10 @@ async fn poll(m: &Mock, device_code: &str) -> (u16, Value) {
             &[],
         )
         .await;
-    if status != 200 {
+    if status == 200 {
+        assert!(header(&h, "ratelimit").is_some());
+        assert!(header(&h, "ratelimit-policy").is_some());
+    } else {
         assert_eq!(header(&h, "content-type"), Some("application/problem+json"));
     }
     (status, body.unwrap())
@@ -291,20 +295,40 @@ async fn expired_and_unknown_codes_answer_alike() {
 #[tokio::test]
 async fn poll_needs_a_device_code() {
     let m = Mock::start().await;
-    for body in [json!({}), json!({"device_code": 1}), json!([])] {
+    for (body, code) in [
+        (json!({}), "body_required"),
+        (json!({"device_code": 1}), "invalid_parameter"),
+        (json!([]), "invalid_parameter"),
+        (
+            json!({"device_code": "x", "client_id": "bonsai"}),
+            "invalid_parameter",
+        ),
+    ] {
         let (status, _, problem) = m
-            .call_unchecked("POST", "/cli/logins/token", None, Some(body.clone()), &[])
+            .call("POST", "/cli/logins/token", None, Some(body.clone()), &[])
             .await;
         assert_eq!(status, 400, "{body}");
-        assert_eq!(problem.unwrap()["code"], "invalid_parameter", "{body}");
+        assert_eq!(problem.unwrap()["code"], code, "{body}");
     }
+    let (status, _, problem) = m
+        .call_raw(
+            "POST",
+            "/cli/logins/token",
+            None,
+            b"{",
+            Some("application/json"),
+            &[],
+        )
+        .await;
+    assert_eq!(status, 400);
+    assert_eq!(problem.unwrap()["code"], "invalid_json");
 }
 
 #[tokio::test]
 async fn start_checks_its_body() {
     let m = Mock::start().await;
     let (status, _, problem) = m
-        .call_unchecked(
+        .call(
             "POST",
             "/cli/logins",
             None,
@@ -317,12 +341,29 @@ async fn start_checks_its_body() {
     assert_eq!(problem["code"], "invalid_parameter");
     assert_eq!(problem["details"][0]["field"], "/hostname");
 
-    let long = "h".repeat(256);
-    let (status, _, problem) = m
-        .call_unchecked("POST", "/cli/logins", None, Some(start_body(&long)), &[])
-        .await;
+    for hostname in ["h".repeat(256), String::new()] {
+        let (status, _, problem) = m
+            .call(
+                "POST",
+                "/cli/logins",
+                None,
+                Some(start_body(&hostname)),
+                &[],
+            )
+            .await;
+        assert_eq!(status, 400, "{hostname:?}");
+        assert_eq!(
+            problem.unwrap()["details"][0]["field"],
+            "/hostname",
+            "{hostname:?}"
+        );
+    }
+
+    let mut extra = start_body("h");
+    extra["scopes"] = json!(["account:read"]);
+    let (status, _, problem) = m.call("POST", "/cli/logins", None, Some(extra), &[]).await;
     assert_eq!(status, 400);
-    assert_eq!(problem.unwrap()["details"][0]["field"], "/hostname");
+    assert_eq!(problem.unwrap()["details"][0]["field"], "/scopes");
 }
 
 #[tokio::test]
@@ -332,7 +373,7 @@ async fn starting_is_limited_to_ten_a_minute_per_ip() {
         start(&m, "h").await;
     }
     let (status, h, problem) = m
-        .call_unchecked("POST", "/cli/logins", None, Some(start_body("h")), &[])
+        .call("POST", "/cli/logins", None, Some(start_body("h")), &[])
         .await;
     assert_eq!(status, 429);
     assert!(header(&h, "retry-after").is_some());
@@ -342,13 +383,36 @@ async fn starting_is_limited_to_ten_a_minute_per_ip() {
     assert_eq!(status, 400);
 }
 
+#[tokio::test]
+async fn polling_is_limited_to_sixty_a_minute_per_ip() {
+    let m = Mock::start().await;
+    let unknown = "x".repeat(32);
+    for _ in 0..60 {
+        poll_refused(&m, &unknown, "expired_token").await;
+    }
+    let (status, h, problem) = m
+        .call(
+            "POST",
+            "/cli/logins/token",
+            None,
+            Some(json!({"device_code": unknown})),
+            &[],
+        )
+        .await;
+    assert_eq!(status, 429);
+    assert!(header(&h, "retry-after").is_some());
+    assert_eq!(problem.unwrap()["code"], "rate_limited");
+    // Starting isn't limited by it.
+    start(&m, "h").await;
+}
+
 // ---------------------------------------------------------------- the approval page
 
 #[tokio::test]
 async fn approve_page_shows_the_request_and_escapes_it() {
     let m = Mock::start().await;
     let (status, _, _) = m
-        .call_unchecked(
+        .call(
             "POST",
             "/cli/logins",
             None,

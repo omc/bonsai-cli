@@ -1,11 +1,12 @@
-//! The browser login, proposed and not in `v1.yml`: an
-//! RFC 8628 device authorization grant that ends in an ordinary API token.
+//! The browser login (`startCliLogin`, `pollCliLogin`): an RFC 8628 device
+//! authorization grant that ends in an ordinary API token.
 //!
 //! - `POST /v1/cli/logins` (no token) starts one: a device code for the CLI
 //!   and a user code for the person. At most [`STARTS_PER_MINUTE`] per IP.
 //! - `POST /v1/cli/logins/token` (no token) polls it with the device code:
 //!   400 `authorization_pending`, `slow_down`, `access_denied` or
 //!   `expired_token` (RFC 8628's codes, as Problems), or, once, the token.
+//!   At most [`POLLS_PER_MINUTE`] per IP.
 //! - `GET /_mock/cli/approve?user_code=` is the dashboard's approval page,
 //!   and `POST /_mock/cli/approve` its form. The admin API approves or
 //!   denies through [`decide`] too.
@@ -26,7 +27,7 @@ use jiff::{SignedDuration, Timestamp};
 use rusqlite::{Connection, OptionalExtension, params};
 use serde_json::{Value, json};
 
-use crate::http::{AnyJsonBody, ClientIp, JsonBody, QueryParams, string_body};
+use crate::http::{ClientIp, JsonBody, QueryParams, string_body};
 use crate::problem::{ProblemBuilder, invalid_parameter, status_problem};
 use crate::{AppState, db, html, ids, seed};
 
@@ -36,6 +37,8 @@ pub const LOGIN_TTL: SignedDuration = SignedDuration::from_secs(600);
 pub const POLL_INTERVAL_SECS: u64 = 1;
 /// Logins one IP address may start per minute.
 pub const STARTS_PER_MINUTE: u32 = 10;
+/// Polls one IP address may make per minute.
+pub const POLLS_PER_MINUTE: u32 = 60;
 /// The scopes the approval page offers checked.
 pub const DEFAULT_SCOPES: &[&str] = &[
     "account:read",
@@ -54,6 +57,7 @@ pub const DEFAULT_ACCOUNT: &str = "acme";
 const USER_CODE_LETTERS: &[u8] = b"BCDFGHJKLMNPQRSTVWXZ";
 const DEVICE_CODE_CHARS: &[u8] = b"0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
 const START_FIELDS: &[&str] = &["client_name", "hostname", "os"];
+const POLL_FIELDS: &[&str] = &["device_code"];
 const FIELD_MAX_CHARS: usize = 255;
 
 pub fn router() -> Router<AppState> {
@@ -74,22 +78,22 @@ async fn start(
     ClientIp(ip): ClientIp,
     body: Result<JsonBody, ProblemBuilder>,
 ) -> Result<Json<CliLoginGrant>, ProblemBuilder> {
-    if let Err(reset) = state
-        .limiter()
-        .check(&format!("cli_login:{ip}"), STARTS_PER_MINUTE)
-    {
-        return Err(status_problem(
-            StatusCode::TOO_MANY_REQUESTS,
-            ProblemCode::RateLimited,
-            format!(
-                "Too many logins started from this address. At most {STARTS_PER_MINUTE} a minute."
-            ),
-        )
-        .retry_after(reset));
-    }
+    limit_per_ip(
+        &state,
+        &format!("cli_login:{ip}"),
+        STARTS_PER_MINUTE,
+        "logins started",
+    )?;
     let body = string_body(body?.0, START_FIELDS, START_FIELDS)?;
     for field in START_FIELDS {
-        if body[*field].chars().count() > FIELD_MAX_CHARS {
+        let chars = body[*field].chars().count();
+        if chars == 0 {
+            return Err(invalid_parameter(
+                &format!("/{field}"),
+                format!("{field} can't be empty."),
+            ));
+        }
+        if chars > FIELD_MAX_CHARS {
             return Err(invalid_parameter(
                 &format!("/{field}"),
                 format!("{field} can be at most {FIELD_MAX_CHARS} characters."),
@@ -135,6 +139,24 @@ async fn start(
     }))
 }
 
+/// 429 `rate_limited` once `key` has made more than `per_minute` requests
+/// in the limiter's window.
+fn limit_per_ip(
+    state: &AppState,
+    key: &str,
+    per_minute: u32,
+    what: &str,
+) -> Result<(), ProblemBuilder> {
+    state.limiter().check(key, per_minute).map_err(|reset| {
+        status_problem(
+            StatusCode::TOO_MANY_REQUESTS,
+            ProblemCode::RateLimited,
+            format!("Too many {what} from this address. At most {per_minute} a minute."),
+        )
+        .retry_after(reset)
+    })
+}
+
 /// `XXXX-XXXX` from [`USER_CODE_LETTERS`].
 fn new_user_code() -> String {
     let letters = ids::random_from(USER_CODE_LETTERS, 8);
@@ -162,34 +184,31 @@ pub fn normalize_user_code(typed: &str) -> String {
 
 // ---------------------------------------------------------------- poll
 
-fn login_problem(code: &str, detail: &str) -> ProblemBuilder {
-    status_problem(
-        StatusCode::BAD_REQUEST,
-        ProblemCode::Unknown(code.to_string()),
-        detail,
-    )
+fn login_problem(code: ProblemCode, detail: &str) -> ProblemBuilder {
+    status_problem(StatusCode::BAD_REQUEST, code, detail)
 }
 
 /// The one answer for a device code that is unknown, expired or spent.
 fn expired_token() -> ProblemBuilder {
     login_problem(
-        "expired_token",
+        ProblemCode::ExpiredToken,
         "This login has expired or was already used. Start a new one.",
     )
 }
 
 async fn poll(
     State(state): State<AppState>,
-    body: Result<AnyJsonBody, ProblemBuilder>,
+    ClientIp(ip): ClientIp,
+    body: Result<JsonBody, ProblemBuilder>,
 ) -> Result<Json<Value>, ProblemBuilder> {
-    let body = body?.0;
-    let Some(device_code) = body.get("device_code").and_then(Value::as_str) else {
-        return Err(invalid_parameter(
-            "/device_code",
-            "device_code is required, as a string.",
-        ));
-    };
-    let hash = seed::sha256_hex(device_code);
+    limit_per_ip(
+        &state,
+        &format!("cli_login_poll:{ip}"),
+        POLLS_PER_MINUTE,
+        "polls",
+    )?;
+    let body = string_body(body?.0, POLL_FIELDS, POLL_FIELDS)?;
+    let hash = seed::sha256_hex(&body["device_code"]);
     let now = Timestamp::now();
     // Not in a transaction: a refusal still records the poll, for `slow_down`.
     // The connection's lock keeps polls of one code from interleaving.
@@ -229,7 +248,10 @@ fn poll_login(c: &Connection, hash: &str, now: Timestamp) -> Result<Json<Value>,
         params![hash, now.to_string()],
     )?;
     match login_state.as_str() {
-        "denied" => Err(login_problem("access_denied", "The login was denied.")),
+        "denied" => Err(login_problem(
+            ProblemCode::AccessDenied,
+            "The login was denied.",
+        )),
         "approved" => {
             let (Some(token), Some(scopes), Some(id), Some(name)) =
                 (token, scopes, account_id, account_name)
@@ -268,12 +290,12 @@ fn poll_login(c: &Connection, hash: &str, now: Timestamp) -> Result<Json<Value>,
             });
             if too_soon {
                 Err(login_problem(
-                    "slow_down",
+                    ProblemCode::SlowDown,
                     "Polled sooner than `interval` after the last poll. Wait longer between polls.",
                 ))
             } else {
                 Err(login_problem(
-                    "authorization_pending",
+                    ProblemCode::AuthorizationPending,
                     "The login is waiting to be approved in the browser.",
                 ))
             }

@@ -72,6 +72,8 @@ pub const COVERAGE: &[(&str, &[&str])] = &[
     ("listRegions", &["regions", "cluster create"]),
     ("listSpaces", &["spaces", "cluster create"]),
     ("listReleases", &["releases", "cluster create"]),
+    ("startCliLogin", &["login"]),
+    ("pollCliLogin", &["login"]),
 ];
 
 #[cfg(test)]

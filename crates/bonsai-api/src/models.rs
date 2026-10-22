@@ -343,8 +343,7 @@ pub struct Release {
     pub version: String,
 }
 
-// Proposed, not in v1.yml yet: reading and revoking the calling token, and the
-// browser login.
+// Proposed, not in v1.yml yet: reading and revoking the calling token.
 
 /// `GET /token`: the calling token's own details.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -355,6 +354,8 @@ pub struct TokenInfo {
     pub expires_at: Option<Timestamp>,
     pub key_prefix: String,
 }
+
+// The browser login.
 
 /// `POST /cli/logins` body.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

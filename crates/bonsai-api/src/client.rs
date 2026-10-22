@@ -382,8 +382,9 @@ impl Client {
         Ok(none_on_404(res)?.map(|_| ()))
     }
 
-    /// `POST /cli/logins`: starts a browser login.
-    /// `POST /cli/logins`. The device code is left out of the response's `raw`
+    // The browser login. Neither operation takes a token.
+
+    /// `POST /cli/logins`: starts a browser login. The device code is left out of the response's `raw`
     /// (it stays in `value`, for the poll).
     pub async fn start_cli_login(&self, body: &CliLoginStart) -> Result<CliLoginGrant> {
         let mut res: Response<CliLoginGrant> = self

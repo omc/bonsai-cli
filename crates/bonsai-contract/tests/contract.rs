@@ -12,8 +12,8 @@ fn h() -> Vec<(String, String)> {
 }
 
 #[test]
-fn lists_all_22_operations() {
-    assert_eq!(c().operations().len(), 22);
+fn lists_all_24_operations() {
+    assert_eq!(c().operations().len(), 24);
     assert!(
         c().operations()
             .iter()

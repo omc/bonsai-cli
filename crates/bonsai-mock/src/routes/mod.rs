@@ -1,5 +1,5 @@
-//! One module per group of `/v1` operations, plus the proposed endpoints
-//! (`login`, `token`) and the `/_mock` admin API and pages (`admin`). Each
+//! One module per group of `/v1` operations, plus the proposed `token`
+//! endpoints and the `/_mock` admin API and pages (`admin`). Each
 //! exposes `router()`, merged into [`crate::app`].
 
 pub mod account;
