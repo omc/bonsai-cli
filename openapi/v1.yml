@@ -1142,7 +1142,7 @@ components:
             action_url:
               type: string
               format: uri
-              description: Set on `payment_failed` to a Stripe Checkout page for adding a card, valid for at least an hour after the response; fetch the Action again for a current one. If Stripe can't be reached, the dashboard page where an account Admin or Billing user adds one instead. Absent otherwise.
+              description: Set on `payment_failed` to a Stripe Checkout page for adding a card, valid for at least an hour after the response; fetch the Action again for a current one. Only a token with `clusters:write` gets a Checkout page, since adding a card through it needs no Bonsai login; any other token, and any when Stripe can't be reached, gets the dashboard page where an account Admin or Billing user adds one instead. Absent otherwise.
         result:
           type: object
           nullable: true
