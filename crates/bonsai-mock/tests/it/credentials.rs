@@ -427,14 +427,21 @@ async fn create_body_rules() {
         json!([{"field": "/name", "message": "Name can't be blank"}])
     );
 
-    // Fields the schema doesn't name are ignored, as the Bonsai API ignores them.
-    let (status, _) = post(
+    // Fields the schema doesn't name are refused, each named, so a typo like
+    // allowed_cidr can't leave a credential open to every address.
+    let (status, problem) = post(
         &m,
         &cluster,
-        json!({"name": "a", "access_type": "rw", "extra": true}),
+        json!({"name": "a", "access_type": "rw", "allowed_cidr": ["10.0.0.0/8"], "extra": true}),
     )
     .await;
-    assert_eq!(status, 201);
+    assert_eq!(status, 400);
+    let problem = problem.unwrap();
+    assert_eq!(problem["code"], "invalid_parameter");
+    assert_eq!(
+        detail_fields(&problem),
+        [json!("/allowed_cidr"), json!("/extra")]
+    );
 }
 
 #[tokio::test]

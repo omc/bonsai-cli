@@ -30,6 +30,15 @@ pub const NAME_MAX_LENGTH: usize = 255;
 
 const ACCESS_TYPES: &[&str] = &["rw", "ro", "rwm", "acl"];
 
+/// `CredentialCreate`'s fields, in `openapi/v1.yml`
+const CREATE_FIELDS: &[&str] = &[
+    "name",
+    "access_type",
+    "allowed_actions",
+    "allowed_index_globs",
+    "allowed_cidrs",
+];
+
 const LAST_RW: &str = "The cluster's last active rw credential can't be revoked.";
 
 pub fn router() -> Router<AppState> {
@@ -261,7 +270,7 @@ async fn create(
 /// API's order, each fault a 400 `invalid_parameter` naming its field: an object,
 /// `access_type` a string, `name` a string of 1 to 255 characters, then each
 /// `allowed_*` that was sent an array of strings. Fields the schema doesn't
-/// name are dropped, not refused, as the Bonsai API drops them.
+/// name are refused first, each named, as the Bonsai API refuses them.
 fn create_body(body: Value) -> Result<CredentialCreate, ProblemBuilder> {
     let obj = match body {
         Value::Null => return Err(body_required()),
@@ -275,6 +284,23 @@ fn create_body(body: Value) -> Result<CredentialCreate, ProblemBuilder> {
             .push_detail(not_an_object()));
         }
     };
+    let unknown: Vec<&String> = obj
+        .keys()
+        .filter(|k| !CREATE_FIELDS.contains(&k.as_str()))
+        .collect();
+    if !unknown.is_empty() {
+        let problem = status_problem(
+            StatusCode::BAD_REQUEST,
+            ProblemCode::InvalidParameter,
+            "The body doesn't match its schema. See details.",
+        );
+        return Err(unknown.into_iter().fold(problem, |p, name| {
+            p.field(
+                &format!("/{name}"),
+                format!("{name} is not a field of this operation."),
+            )
+        }));
+    }
     let Some(kind) = obj.get("access_type").and_then(Value::as_str) else {
         return Err(invalid_parameter(
             "/access_type",
