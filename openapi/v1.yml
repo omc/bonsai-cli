@@ -1294,6 +1294,8 @@ components:
             url: { type: string, description: "A complete `https://user:pass@host` URL." }
     CredentialCreate:
       type: object
+      description: A field this schema doesn't list is `400 invalid_parameter`.
+      additionalProperties: false
       required: [name, access_type]
       properties:
         name: { type: string, minLength: 1, maxLength: 255, description: A label. }
