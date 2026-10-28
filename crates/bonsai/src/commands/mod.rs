@@ -8,6 +8,7 @@ mod catalogue;
 mod cluster;
 mod misc;
 mod observe;
+mod skill;
 mod url;
 
 use std::path::PathBuf;
@@ -170,6 +171,7 @@ pub async fn run(command: Command, ctx: &Ctx) -> Result<()> {
         Command::Doctor => ctx.abortable(misc::doctor(ctx)).await,
         Command::Version => ctx.abortable(misc::version(ctx)).await,
         Command::Completion(args) => misc::completion(ctx, args),
+        Command::Skill(command) => skill::run(ctx, command),
         Command::Api(args) => ctx.abortable(api::api(ctx, args)).await,
         Command::Clusters(args) => cluster::list(ctx, args).await,
         Command::Cluster(command) => cluster::run(ctx, command).await,

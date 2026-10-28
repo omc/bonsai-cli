@@ -86,6 +86,7 @@ bonsai url search --env ELASTICSEARCH_URL >> .env
 | Actions | `action show`, `wait` |
 | Catalogue | `plans`, `regions`, `spaces`, `releases` |
 | Anything else | `api`, `completion` |
+| Agents | `skill install`, `skill print` |
 
 `bonsai <command> --help` shows each command's flags.
 
@@ -122,6 +123,12 @@ bonsai cluster destroy "$id" --confirm "ci-$RUN_ID"
 ```
 
 If a create fails after Bonsai started it, Bonsai removes the failed cluster, and the CLI tells you so.
+
+### Agents
+
+`bonsai skill install` writes a [Claude Code skill](https://docs.claude.com/en/docs/claude-code/skills) to `~/.claude/skills/bonsai/SKILL.md`. It tells the agent to use `--json --no-input`, which commands to run, what the exit codes mean, and to confirm before changes that cost money. Add `--project` to write it to `.claude/skills/` in the current directory instead. Run it again after an upgrade to bring the skill up to date.
+
+For other agents, `bonsai skill print` prints the same text, e.g. to add to `AGENTS.md`.
 
 ### Exit codes
 

@@ -99,6 +99,9 @@ pub enum Command {
     Api(ApiArgs),
     /// Print a shell completion script
     Completion(CompletionArgs),
+    /// Teach Claude Code, or another agent, to use this CLI
+    #[command(subcommand)]
+    Skill(SkillCommand),
 }
 
 #[derive(Debug, Args)]
@@ -415,6 +418,21 @@ pub struct CompletionArgs {
     /// The shell
     #[arg(value_enum)]
     pub shell: clap_complete::Shell,
+}
+
+#[derive(Debug, Subcommand)]
+pub enum SkillCommand {
+    /// Write the bonsai skill to ~/.claude/skills, or to the project's .claude/skills
+    Install(SkillInstallArgs),
+    /// Print the skill, e.g. to add it to AGENTS.md
+    Print,
+}
+
+#[derive(Debug, Args)]
+pub struct SkillInstallArgs {
+    /// Install into ./.claude/skills instead of ~/.claude/skills
+    #[arg(long)]
+    pub project: bool,
 }
 
 /// A duration such as `30m`, `7d`, `1h30m` or ISO 8601's `PT90S`. Days are 24 hours.
