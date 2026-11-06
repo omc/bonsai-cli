@@ -67,5 +67,9 @@ codegen-units = 1
 strip = true
 panic = "abort"
 
+# The profile dist builds the release binaries with.
+[profile.dist]
+inherits = "release"
+
 [profile.dev.package."*"]
 opt-level = 1
