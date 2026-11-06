@@ -1,8 +1,7 @@
-# release-plz opens the release PR (version bump + changelog) and tags the release. It does
-# not create the GitHub release and does not publish: dist builds and publishes the release
-# when the tag is pushed (.github/workflows/release.yml), and the crates are `publish = false`.
-# Only `bonsai` is released, tagged `v<version>`: dist's trigger matches any `*X.Y.Z*` tag, so
-# per-crate tags (`<package>-v<version>`) would each start a release run.
+# release-plz only opens the release PR (version bump + changelog). `release-plz release` is
+# not part of the flow: .github/workflows/release.yml (dist) builds the binaries, creates the
+# `v<version>` tag and the GitHub release when it's run. The crates are `publish = false`.
+# Only `bonsai` is released, so only it gets a version bump and a changelog.
 [workspace]
 release = false
 git_release_enable = false

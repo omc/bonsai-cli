@@ -5,7 +5,7 @@ on:
     branches: ["**"]
   pull_request:
   # release.yml runs this alongside its builds and publishes only if it passes,
-  # so a tag on a commit that fails CI ships nothing. dist passes its plan; unused.
+  # so a commit that fails CI gets no tag and ships nothing. dist passes its plan; unused.
   workflow_call:
     inputs:
       plan:
@@ -70,7 +70,7 @@ jobs:
       - uses: EmbarkStudios/cargo-deny-action@v2
 
   # The release builds static musl binaries (dist-workspace.toml); build them on
-  # every PR too, so a musl link problem shows before a tag.
+  # every PR too, so a musl link problem shows before a release.
   musl:
     needs: [fmt, clippy, deny]
     strategy:
@@ -124,13 +124,12 @@ jobs:
 
   # `nix run github:omc/bonsai-cli` builds flake.nix; check it still builds. It
   # builds every dependency from source, about 8 minutes on a 2-vCPU runner, so it
-  # runs only when the build's inputs change, on main and on release tags.
+  # runs only when the build's inputs change and on main, which covers releases.
   nix:
     needs: [fmt, clippy, deny, changes]
     if: >-
       needs.changes.outputs.nix == 'true' ||
-      github.ref == 'refs/heads/main' ||
-      startsWith(github.ref, 'refs/tags/')
+      github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v6

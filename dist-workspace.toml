@@ -7,10 +7,12 @@ members = ["cargo:."]
 [dist]
 cargo-dist-version = "0.33.0"
 ci = "github"
-installers = ["shell", "homebrew", "npm"]
-tap = "omc/homebrew-tap"
-npm-scope = "@omc"
-publish-jobs = ["homebrew", "npm"]
+# The run takes the tag as an input and creates it with the GitHub Release, so CI
+# tags without a personal token: a tag GITHUB_TOKEN pushes starts no workflow.
+dispatch-releases = true
+# GitHub Release only. Homebrew and npm need "homebrew" and "npm" back in `installers`,
+# with `tap`, `npm-scope`, `publish-jobs` and the HOMEBREW_TAP_TOKEN and NPM_TOKEN secrets.
+installers = ["shell"]
 local-artifacts-jobs = ["./ci"]
 targets = [
   "aarch64-apple-darwin",
@@ -20,7 +22,12 @@ targets = [
 ]
 install-path = "CARGO_HOME"
 install-updater = true
-github-attestations = true
+# No `github-attestations`: private repos need GitHub Enterprise Cloud for them, and
+# omc is on Team. Turn it back on if the repo goes public.
+
+# dist's default for this target, macos-14, was retired on 2026-11-02.
+[dist.github-custom-runners]
+aarch64-apple-darwin = "macos-15"
 
 # The version of each action dist emits, where dist's default is older.
 [dist.github-action-commits]
