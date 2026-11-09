@@ -471,7 +471,7 @@ pub async fn whoami(ctx: &Ctx) -> Result<()> {
     ];
     if let Some(t) = token {
         let t = t.value;
-        rows.push(("Token key", t.key));
+        rows.push(("Token key (public)", t.key));
         if let Some(name) = t.name {
             rows.push(("Token name", name));
         }
