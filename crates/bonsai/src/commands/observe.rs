@@ -48,7 +48,7 @@ pub async fn usage(ctx: &Ctx, args: UsageArgs) -> Result<()> {
         let c = &cluster.value;
         let stats = &c.stats;
         let range = span(args.since);
-        let mut rows = vec![("Cluster", cluster_label(c))];
+        let mut rows = cluster_rows(c);
         rows.extend(usage_rows(stats));
         if let Some(t) = stats.polled_at {
             rows.push(("Polled", relative_time(t, Timestamp::now())));
@@ -88,13 +88,11 @@ pub async fn metrics(ctx: &Ctx, args: MetricsArgs) -> Result<()> {
             return ctx.out.json(&metrics.raw);
         }
         let m = &metrics.value;
-        let mut rows = vec![
-            ("Cluster", cluster_label(&cluster.value)),
-            (
-                "Range",
-                format!("last {}, {} buckets", span(args.since), m.resolution),
-            ),
-        ];
+        let mut rows = cluster_rows(&cluster.value);
+        rows.push((
+            "Range",
+            format!("last {}, {} buckets", span(args.since), m.resolution),
+        ));
         if m.buckets.is_empty() {
             rows.push(("Requests", "none in this range".into()));
         } else {
@@ -128,9 +126,10 @@ pub async fn queries(ctx: &Ctx, args: QueriesArgs) -> Result<()> {
         let limit = args.top.unwrap_or(DEFAULT_TOP);
         let shown = t.queries.len().min(limit);
         ctx.out.info(&format!(
-            "Top {shown} of {} search terms on {} over {}, computed {}",
+            "Top {shown} of {} search terms on {} (ID {}) over {}, computed {}",
             t.queries.len(),
-            cluster_label(&cluster.value),
+            cluster.value.name,
+            cluster.value.id,
             t.window,
             relative_time(t.computed_at, Timestamp::now()),
         ));
@@ -199,8 +198,9 @@ pub(super) fn explain(e: ApiError, scope: &str) -> anyhow::Error {
     anyhow::Error::new(e).context(Explained(msg))
 }
 
-fn cluster_label(c: &Cluster) -> String {
-    format!("{} ({})", c.name, c.id)
+/// The cluster's name and ID, each labelled: `ID` as the API calls it.
+fn cluster_rows(c: &Cluster) -> Vec<(&'static str, String)> {
+    vec![("Cluster", c.name.clone()), ("ID", c.id.clone())]
 }
 
 /// `30d`, `12h`, `90m` or `45s`: the largest unit that divides `d`.

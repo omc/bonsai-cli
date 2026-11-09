@@ -31,6 +31,19 @@ fn create_cluster(env: &Env, name: &str) -> (String, String) {
     )
 }
 
+/// The cluster's name and its ID on separate, labelled lines, as the API names them.
+fn assert_names_and_ids(text: &str, name: &str, id: &str) {
+    let value = |label: &str| {
+        text.lines()
+            .find_map(|l| l.strip_prefix(label).filter(|r| r.starts_with(' ')))
+            .map(str::trim)
+            .unwrap_or_else(|| panic!("no {label} line: {text}"))
+            .to_owned()
+    };
+    assert_eq!(value("Cluster"), name);
+    assert_eq!(value("ID"), id);
+}
+
 /// Sets a mock scenario through the admin API.
 async fn set_scenario(env: &Env, key: &str, value: Value) {
     let url = env
@@ -407,6 +420,7 @@ async fn usage_shows_the_plan_limits() {
     for want in ["Docs", "Shards", "Size", "Health"] {
         assert!(text.contains(want), "{want}: {text}");
     }
+    assert_names_and_ids(&text, "used", &cluster);
     assert!(text.contains('%'), "{text}");
 
     let out = env
@@ -438,6 +452,7 @@ async fn metrics_shows_the_worst_bucket() {
     for want in ["Requests", "5xx", "p50", "p95", "p99"] {
         assert!(text.contains(want), "{want}: {text}");
     }
+    assert_names_and_ids(&text, "measured", &cluster);
     // Latency says what it is, and no line is a sparkline.
     for l in ["p50", "p95", "p99"] {
         let line = text.lines().find(|x| x.starts_with(l)).unwrap();
@@ -496,6 +511,11 @@ async fn queries_sanitized() {
     let text = stdout(&out);
     assert!(text.contains("red shoes"), "{text}");
     assert!(text.contains("OVERWRITE"), "{text}");
+    let note = stderr(&out);
+    assert!(
+        note.contains(&format!("on searched (ID {cluster})")),
+        "{note}"
+    );
     for bad in ['\x1b', '\r', '\u{202e}', '\t'] {
         assert!(!text.contains(bad), "{bad:?} in {text:?}");
     }
