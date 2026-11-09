@@ -443,7 +443,7 @@ async fn usage_refuses_more_than_90_days() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn metrics_shows_the_worst_bucket() {
+async fn metrics_shows_typical_and_slowest_latency() {
     let env = Env::start().await;
     let (cluster, _) = create_cluster(&env, "measured");
     let out = env.authed().args(["metrics", &cluster]).output().unwrap();
@@ -457,9 +457,12 @@ async fn metrics_shows_the_worst_bucket() {
     for l in ["p50", "p95", "p99"] {
         let line = text.lines().find(|x| x.starts_with(l)).unwrap();
         assert!(
-            line.ends_with("(worst bucket)") || line.trim_end().ends_with(" -"),
+            line.contains(" ms typical, ")
+                || line.trim_end().ends_with(" ms")
+                || line.trim_end().ends_with(" -"),
             "{line}"
         );
+        assert!(!line.contains("bucket"), "{line}");
     }
     assert!(
         !text.chars().any(|c| ('\u{2581}'..='\u{2588}').contains(&c)),

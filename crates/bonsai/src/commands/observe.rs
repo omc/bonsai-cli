@@ -96,7 +96,7 @@ pub async fn metrics(ctx: &Ctx, args: MetricsArgs) -> Result<()> {
         if m.buckets.is_empty() {
             rows.push(("Requests", "none in this range".into()));
         } else {
-            rows.extend(metric_rows(&m.buckets));
+            rows.extend(metric_rows(&m.buckets, &m.resolution));
         }
         ctx.out.kv(&rows)
     })
@@ -233,9 +233,10 @@ fn trend(values: &[u64], fmt: fn(u64) -> String) -> String {
     }
 }
 
-/// Totals for each measure. A rate is over the range's requests; a percentile is
-/// the worst bucket's, since percentiles can't be averaged, and says so.
-fn metric_rows(buckets: &[MetricBucket]) -> Vec<(&'static str, String)> {
+/// Totals for each measure. A rate is over the range's requests. Percentiles can't
+/// be averaged across buckets, so a latency is the median bucket's ("typical") and
+/// the slowest bucket's, named by its size (`resolution`, e.g. `1m`).
+fn metric_rows(buckets: &[MetricBucket], resolution: &str) -> Vec<(&'static str, String)> {
     let sum = |f: fn(&MetricBucket) -> u64| buckets.iter().map(f).sum::<u64>();
     let requests = sum(|b| b.requests);
     let rate = |label: &'static str, f: fn(&MetricBucket) -> u64| {
@@ -247,12 +248,20 @@ fn metric_rows(buckets: &[MetricBucket]) -> Vec<(&'static str, String)> {
         (label, shown)
     };
     let latency = |label: &'static str, f: fn(&MetricBucket) -> Option<f64>| {
-        let worst = buckets
+        let mut seen: Vec<f64> = buckets
             .iter()
             .filter_map(f)
             .filter(|v| v.is_finite())
-            .reduce(f64::max);
-        let shown = worst.map_or("-".to_owned(), |w| format!("{w:.1} ms (worst bucket)"));
+            .collect();
+        let shown = match seen.len() {
+            0 => "-".to_owned(),
+            1 => format!("{:.1} ms", seen[0]),
+            _ => {
+                let slowest = seen.iter().copied().fold(f64::MIN, f64::max);
+                let typical = median(&mut seen);
+                format!("{typical:.1} ms typical, {slowest:.1} ms in the slowest {resolution}")
+            }
+        };
         (label, shown)
     };
     vec![
@@ -266,6 +275,18 @@ fn metric_rows(buckets: &[MetricBucket]) -> Vec<(&'static str, String)> {
         latency("p95", |b| b.duration_ms.p95),
         latency("p99", |b| b.duration_ms.p99),
     ]
+}
+
+/// The middle value, or the mean of the middle two. `values` must be finite and
+/// not empty; it's left sorted.
+fn median(values: &mut [f64]) -> f64 {
+    values.sort_by(f64::total_cmp);
+    let mid = values.len() / 2;
+    if values.len().is_multiple_of(2) {
+        (values[mid - 1] + values[mid]) / 2.0
+    } else {
+        values[mid]
+    }
 }
 
 #[cfg(test)]
@@ -334,23 +355,43 @@ mod tests {
     }
 
     #[test]
-    fn metrics_show_the_worst_bucket_and_overall_rates() {
-        let rows = metric_rows(&[
-            bucket(100, 0, Some(10.0)),
-            bucket(100, 10, Some(90.0)),
-            bucket(0, 0, None),
-        ]);
+    fn metrics_show_typical_and_slowest_latency_and_overall_rates() {
+        let rows = metric_rows(
+            &[
+                bucket(100, 0, Some(10.0)),
+                bucket(100, 10, Some(90.0)),
+                bucket(100, 0, Some(20.0)),
+                bucket(0, 0, None),
+            ],
+            "1m",
+        );
         let get = |k: &str| rows.iter().find(|(l, _)| *l == k).unwrap().1.clone();
-        assert_eq!(get("Requests"), "200");
-        // 10 of 200 requests, not the mean of the buckets' rates.
-        assert_eq!(get("5xx"), "5.0%");
-        // The worst bucket's value, labelled as such; the empty bucket is no zero.
-        assert_eq!(get("p95"), "90.0 ms (worst bucket)");
-        assert_eq!(get("p99"), "180.0 ms (worst bucket)");
+        assert_eq!(get("Requests"), "300");
+        // 10 of 300 requests, not the mean of the buckets' rates.
+        assert_eq!(get("5xx"), "3.3%");
+        // The median bucket and the slowest; the empty bucket is no zero.
+        assert_eq!(get("p95"), "20.0 ms typical, 90.0 ms in the slowest 1m");
+        assert_eq!(get("p99"), "40.0 ms typical, 180.0 ms in the slowest 1m");
         let all: String = rows.iter().flat_map(|(k, v)| [*k, v.as_str()]).collect();
         assert!(
             !all.chars().any(|c| ('\u{2581}'..='\u{2588}').contains(&c)),
             "{all}"
         );
+    }
+
+    #[test]
+    fn one_bucket_or_none_shows_one_latency() {
+        let rows = metric_rows(&[bucket(5, 0, Some(12.0))], "1h");
+        let get = |k: &str| rows.iter().find(|(l, _)| *l == k).unwrap().1.clone();
+        assert_eq!(get("p95"), "12.0 ms");
+        let rows = metric_rows(&[bucket(0, 0, None)], "1h");
+        let get = |k: &str| rows.iter().find(|(l, _)| *l == k).unwrap().1.clone();
+        assert_eq!(get("p95"), "-");
+    }
+
+    #[test]
+    fn the_median_of_an_even_count_is_the_middle_pair_s_mean() {
+        assert_eq!(median(&mut [4.0, 1.0, 3.0, 2.0]), 2.5);
+        assert_eq!(median(&mut [3.0, 1.0, 2.0]), 2.0);
     }
 }
