@@ -623,6 +623,34 @@ async fn bonsai_cluster_is_the_default_cluster() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn verbose_explains_the_404_before_a_name_lookup() {
+    let env = Env::start().await;
+    let id = create(&env, "by-name", "sandbox");
+    let out = env
+        .authed()
+        .args(["-v", "cluster", "show", "by-name", "--json"])
+        .output()
+        .unwrap();
+    assert!(out.status.success(), "{}", stderr(&out));
+    assert!(
+        stderr(&out).contains("\"by-name\" isn't a cluster ID; looking it up by name"),
+        "{}",
+        stderr(&out)
+    );
+    // An ID resolves in one request, with no such line.
+    let out = env
+        .authed()
+        .args(["-v", "cluster", "show", &id, "--json"])
+        .output()
+        .unwrap();
+    assert!(
+        !stderr(&out).contains("isn't a cluster ID"),
+        "{}",
+        stderr(&out)
+    );
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn clusters_rides_out_a_429() {
     let env = Env::start().await;
     admin(

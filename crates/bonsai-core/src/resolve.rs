@@ -13,7 +13,10 @@ use crate::CoreError;
 pub async fn resolve_cluster(api: &Client, arg: &str) -> Result<Response<Cluster>, CoreError> {
     match api.get_cluster(arg).await {
         Ok(found) => return Ok(found),
-        Err(e) if e.status() == Some(404) || matches!(e, ApiError::InvalidPath(_)) => {}
+        Err(e) if e.status() == Some(404) || matches!(e, ApiError::InvalidPath(_)) => {
+            // The 404 just logged at -v is this lookup, not a failure.
+            tracing::debug!("{arg:?} isn't a cluster ID; looking it up by name");
+        }
         Err(e) => return Err(e.into()),
     }
     let query = ClusterQuery {
