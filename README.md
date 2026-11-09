@@ -86,7 +86,7 @@ bonsai url search --env ELASTICSEARCH_URL >> .env
 | Actions | `action show`, `wait` |
 | Catalogue | `plans`, `regions`, `spaces`, `releases` |
 | Anything else | `api`, `completion` |
-| Agents | `skill install`, `skill print` |
+| Agents | `skill install`, `skill print`, `mcp` |
 
 `bonsai <command> --help` shows each command's flags.
 
@@ -129,6 +129,22 @@ If a create fails after Bonsai started it, Bonsai removes the failed cluster, an
 `bonsai skill install` writes a [Claude Code skill](https://docs.claude.com/en/docs/claude-code/skills) to `~/.claude/skills/bonsai/SKILL.md`. It tells the agent to use `--json --no-input`, which commands to run, what the exit codes mean, and to confirm before changes that cost money. Add `--project` to write it to `.claude/skills/` in the current directory instead. Run it again after an upgrade to bring the skill up to date.
 
 For other agents, `bonsai skill print` prints the same text, e.g. to add to `AGENTS.md`.
+
+### MCP
+
+`bonsai mcp` is an [MCP](https://modelcontextprotocol.io) server on stdin and stdout, for clients that call tools instead of running a shell. It uses the same token as every other command, so `bonsai login` is all the setup it needs, and the token never goes in the client's config. To add it to Claude Code, run this in your project folder:
+
+```sh
+claude mcp add bonsai -- bonsai mcp
+```
+
+Add `--scope user` to have it in every project. Other clients (Claude Desktop, Cursor, VS Code) take the usual `mcpServers` entry: `{"bonsai": {"command": "bonsai", "args": ["mcp"]}}`. Where there's no keychain, as in a container, set `BONSAI_TOKEN` in the entry's `env`.
+
+Its tools mirror the commands: `list_clusters`, `get_cluster`, `cluster_history`, `usage`, `metrics`, `top_queries`, `list_plans`, `list_regions`, `list_spaces`, `list_releases`, `whoami`, `get_action`, `wait_action`, and to change things `create_cluster`, `rename_cluster`, `resize_cluster` and `destroy_cluster`. Each returns the API's JSON, as `--json` prints it.
+
+- **Changes.** `create_cluster`, `resize_cluster` and `destroy_cluster` return the Action at once; the agent follows it with `wait_action`, which waits up to five minutes per call. `destroy_cluster` needs `confirm` set to the cluster's current name. `bonsai mcp --read-only` leaves out the tools that change clusters.
+- **Passwords.** No tool returns one. `write_cluster_url` writes the connection URL to an env file in the project (`.env` and `BONSAI_URL` by default) and answers with the password as `****`. It writes only below the folder the server started in, and refuses a file that git doesn't ignore or that is tracked, so the password can't be committed. The file is left with mode 0600.
+- **Search terms.** `top_queries` returns what your cluster's users typed. It is data, and the tool says so to the agent, but treat it as untrusted text.
 
 ### Exit codes
 
