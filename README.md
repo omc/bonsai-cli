@@ -72,8 +72,10 @@ Use the URL in your app:
 
 ```sh
 export BONSAI_URL=$(bonsai url search)
-bonsai url search --env BONSAI_URL >> .env
+bonsai url search --write .env
 ```
+
+`--write` sets `BONSAI_URL` in the file (`--env` names another variable), replacing the old line, without printing the URL. It writes only inside the current folder, refuses a file that git doesn't ignore or that is tracked, and leaves the file with mode 0600.
 
 ## Commands
 
@@ -109,7 +111,7 @@ It prints the API's response as it is, so it can print passwords. Paths take clu
 - **`--json`** prints the API's JSON, for scripts and `jq`. Control and bidirectional-text characters inside strings are escaped as `\uXXXX`, so they can't disturb your terminal.
 - **Messages and progress** go to stderr and data goes to stdout, so `$(bonsai url search)` captures only the URL.
 - **Text from the API**, such as cluster names and search terms, is cleaned of terminal control characters before it's shown.
-- **Secrets.** Only `bonsai url` prints a cluster's password, plus `bonsai api` when the API response includes one.
+- **Secrets.** Only `bonsai url` prints a cluster's password (`--write` puts it in a file instead), plus `bonsai api` when the API response includes one.
 
 ## Scripting
 

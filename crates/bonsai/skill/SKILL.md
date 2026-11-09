@@ -30,7 +30,7 @@ Run `bonsai whoami --json`. Exit 3 means there's no valid token: ask the user to
 | Rename | `bonsai cluster rename <cluster> <new-name> --json --no-input` |
 | Change plan | `bonsai cluster resize <cluster> <plan> --json --no-input` |
 | Destroy | `bonsai cluster destroy <cluster> --confirm <current-name> --json --no-input` |
-| Connection URL | Written to a file, never printed: see Secrets |
+| Connection URL, into the app's env file | `bonsai url <cluster> --write .env --json --no-input` (see Secrets) |
 | Docs, shards and size against the plan's limits | `bonsai usage <cluster> --since 7d --json` |
 | Request rates, errors, latency | `bonsai metrics <cluster> --since 1h --json` |
 | Top search terms | `bonsai queries <cluster> --json` |
@@ -51,18 +51,15 @@ Create, resize and destroy start an Action on Bonsai and wait for it, 30 minutes
 
 ## Secrets
 
-`bonsai url` prints the cluster's password: never run it so its output comes back to you, only as below. `bonsai api` prints whatever the API returns, which can include passwords. Never repeat a password in the chat, commits or logs.
+`bonsai url` prints the cluster's password: never run it without `--write`. `bonsai api` prints whatever the API returns, which can include passwords. Never repeat a password in the chat, commits or logs.
 
-If the bonsai MCP server's `write_cluster_url` tool is available, save the URL with it: it checks the file and never shows you the password.
-
-Otherwise write the URL to `.env` as `BONSAI_URL`, unless the user names another file or variable:
-
-1. Make sure git won't commit the file: `git check-ignore -q .env`. Exit 0 means it's ignored; 128 means this isn't a git repository. Exit 1 means it isn't ignored, or is tracked: stop and ask the user to add it to `.gitignore` first.
-2. Replace any old line instead of adding another, keeping the file private:
+Write the URL straight into the file the app reads, with the bonsai MCP server's `write_cluster_url` tool if it's available, or:
 
 ```sh
-( umask 077; { grep -Ev '^(export )?BONSAI_URL=' .env 2>/dev/null; bonsai url <cluster> --env BONSAI_URL; } > .env.new ) && mv .env.new .env || { rm -f .env.new; false; }
+bonsai url <cluster> --write .env --json --no-input
 ```
+
+It sets `BONSAI_URL` (`--env NAME` for another variable), replacing any old line, and answers with the password as `****`. It writes only inside the current folder, leaves the file readable only by its owner, and refuses (exit 2) a file git doesn't ignore or that is tracked: then ask the user to add it to `.gitignore` instead of working around it.
 
 ## Exit codes
 
