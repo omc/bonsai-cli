@@ -21,20 +21,23 @@ Run `bonsai whoami --json`. Exit 3 means there's no valid token: ask the user to
 
 ## Commands
 
+Everything about clusters is a subcommand of `cluster`: list, create, change, connect to and watch them.
+
 | Task | Command |
 |---|---|
-| List clusters | `bonsai clusters --json` (filters: `--state`, `--region`, `--name`) |
+| List clusters | `bonsai cluster list --json` (filters: `--state`, `--region`, `--name`) |
 | One cluster | `bonsai cluster show <cluster> --json` |
-| What can be created | `bonsai plans --region <region> --json`, `bonsai regions --json`, `bonsai releases --json`, `bonsai spaces --json` |
 | Create | `bonsai cluster create <name> --plan <plan> --region <region> --json --no-input` |
 | Rename | `bonsai cluster rename <cluster> <new-name> --json --no-input` |
 | Change plan | `bonsai cluster resize <cluster> <plan> --json --no-input` |
 | Destroy | `bonsai cluster destroy <cluster> --confirm <current-name> --json --no-input` |
-| Connection URL, into the app's env file | `bonsai url <cluster> --write .env --json --no-input` (see Secrets) |
-| Docs, shards and size against the plan's limits | `bonsai usage <cluster> --since 7d --json` |
-| Request rates, errors, latency | `bonsai metrics <cluster> --since 1h --json` |
-| Top search terms | `bonsai queries <cluster> --json` |
-| Past changes | `bonsai history <cluster> --json`, `bonsai action show <action-id> --json` |
+| Connection URL, into the app's env file | `bonsai cluster url <cluster> --write .env --json --no-input` (see Secrets) |
+| Docs, shards and size against the plan's limits | `bonsai cluster usage <cluster> --since 7d --json` |
+| Request rates, errors, latency | `bonsai cluster metrics <cluster> --since 1h --json` |
+| Top search terms | `bonsai cluster queries <cluster> --json` |
+| Past changes | `bonsai cluster history <cluster> --json`, `bonsai action show <action-id> --json` |
+| Plans, and where they're offered | `bonsai plans --json` (`--region <region>` for one region), `bonsai regions --plan <plan> --json` |
+| Other catalogue | `bonsai regions --json`, `bonsai releases --json`, `bonsai spaces --json` |
 | Anything without a command | `bonsai api GET /clusters --paginate` |
 
 `<cluster>` is an ID or a name. A name two clusters share exits 2; use the ID then. `bonsai api` paths take IDs, not names.
@@ -51,12 +54,12 @@ Create, resize and destroy start an Action on Bonsai and wait for it, 30 minutes
 
 ## Secrets
 
-`bonsai url` prints the cluster's password: never run it without `--write`. `bonsai api` prints whatever the API returns, which can include passwords. Never repeat a password in the chat, commits or logs.
+`bonsai cluster url` prints the cluster's password: never run it without `--write`. `bonsai api` prints whatever the API returns, which can include passwords. Never repeat a password in the chat, commits or logs.
 
 Write the URL straight into the file the app reads, with the bonsai MCP server's `write_cluster_url` tool if it's available, or:
 
 ```sh
-bonsai url <cluster> --write .env --json --no-input
+bonsai cluster url <cluster> --write .env --json --no-input
 ```
 
 It sets `BONSAI_URL` (`--env NAME` for another variable), replacing any old line, and answers with the password as `****`. It writes only inside the current folder, leaves the file readable only by its owner, and refuses (exit 2) a file git doesn't ignore or that is tracked: then ask the user to add it to `.gitignore` instead of working around it.

@@ -57,25 +57,9 @@ pub enum Command {
     Version,
 
     // ---- Clusters
-    /// List clusters (same as `cluster list`)
-    Clusters(ClusterListArgs),
-    /// Create, show, change and remove clusters
+    /// List, create, change, watch and connect to clusters
     #[command(subcommand)]
     Cluster(ClusterCommand),
-    /// A cluster's Actions, newest first (same as `cluster history`)
-    History(HistoryArgs),
-
-    // ---- Connecting
-    /// Print a cluster's connection URL, password included
-    Url(UrlArgs),
-
-    // ---- Watching a cluster
-    /// Docs, shards and size against the plan's limits, over time
-    Usage(UsageArgs),
-    /// Request rates, errors, traffic and latency over time
-    Metrics(MetricsArgs),
-    /// The most frequent search terms
-    Queries(QueriesArgs),
 
     // ---- Actions
     /// Look at Actions
@@ -184,6 +168,14 @@ pub enum ClusterCommand {
     History(HistoryArgs),
     /// Block until a cluster reaches a state
     Wait(ClusterWaitArgs),
+    /// Print a cluster's connection URL, password included, or write it to a file
+    Url(UrlArgs),
+    /// Docs, shards and size against the plan's limits, over time
+    Usage(UsageArgs),
+    /// Request rates, errors, traffic and latency over time
+    Metrics(MetricsArgs),
+    /// The most frequent search terms
+    Queries(QueriesArgs),
 }
 
 #[derive(Debug, Args)]
@@ -497,34 +489,40 @@ mod tests {
     }
 
     #[test]
-    fn clusters_takes_list_flags() {
-        let cli = Cli::try_parse_from(["bonsai", "clusters", "--state", "ready"]).unwrap();
-        assert!(matches!(cli.command, Command::Clusters(a) if a.state.as_deref() == Some("ready")));
+    fn cluster_list_takes_list_flags() {
+        let cli = Cli::try_parse_from(["bonsai", "cluster", "list", "--state", "ready"]).unwrap();
+        assert!(matches!(
+            cli.command,
+            Command::Cluster(ClusterCommand::List(a)) if a.state.as_deref() == Some("ready")
+        ));
     }
 
     #[test]
-    fn history_is_also_top_level() {
-        let cli =
-            Cli::try_parse_from(["bonsai", "history", "c", "--limit", "5", "--steps"]).unwrap();
-        assert!(matches!(cli.command, Command::History(a) if a.limit == Some(5) && a.steps));
+    fn the_old_top_level_cluster_commands_are_gone() {
+        for old in ["clusters", "history", "url", "usage", "metrics", "queries"] {
+            assert!(Cli::try_parse_from(["bonsai", old, "c"]).is_err(), "{old}");
+        }
     }
 
     #[test]
     fn queries_top_is_none_unless_given() {
         let top = |args: &[&str]| match Cli::try_parse_from(args).unwrap().command {
-            Command::Queries(q) => q.top,
+            Command::Cluster(ClusterCommand::Queries(q)) => q.top,
             _ => unreachable!(),
         };
-        assert_eq!(top(&["bonsai", "queries", "c"]), None);
-        assert_eq!(top(&["bonsai", "queries", "c", "--top", "5"]), Some(5));
+        assert_eq!(top(&["bonsai", "cluster", "queries", "c"]), None);
+        assert_eq!(
+            top(&["bonsai", "cluster", "queries", "c", "--top", "5"]),
+            Some(5)
+        );
     }
 
     #[test]
     fn list_commands_take_wide() {
         let wide = |args: &[&str]| match Cli::try_parse_from(args).unwrap().command {
-            Command::Clusters(a) | Command::Cluster(ClusterCommand::List(a)) => a.wide,
-            Command::History(a) | Command::Cluster(ClusterCommand::History(a)) => a.wide,
-            Command::Queries(a) => a.wide,
+            Command::Cluster(ClusterCommand::List(a)) => a.wide,
+            Command::Cluster(ClusterCommand::History(a)) => a.wide,
+            Command::Cluster(ClusterCommand::Queries(a)) => a.wide,
             Command::Plans(a) => a.wide,
             Command::Releases(a) => a.wide,
             Command::Regions(a) => a.wide,
@@ -532,11 +530,9 @@ mod tests {
             _ => unreachable!(),
         };
         for cmd in [
-            &["clusters"][..],
-            &["cluster", "list"],
-            &["history", "c"],
+            &["cluster", "list"][..],
             &["cluster", "history", "c"],
-            &["queries", "c"],
+            &["cluster", "queries", "c"],
             &["plans"],
             &["releases"],
             &["regions"],

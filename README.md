@@ -56,13 +56,13 @@ export BONSAI_TOKEN=bonsai_…
 ## Quick start
 
 ```sh
-bonsai plans                                    # what you can create
-bonsai regions
+bonsai plans                                    # what you can create, and where
+bonsai regions --plan standard-fir              # where one plan is offered
 bonsai cluster create search --plan standard-fir --region aws-us-east-1
-bonsai url search                               # the connection URL, password included
-bonsai usage search
-bonsai metrics search
-bonsai queries search                           # needs the query_logs:read scope
+bonsai cluster url search                       # the connection URL, password included
+bonsai cluster usage search
+bonsai cluster metrics search
+bonsai cluster queries search                   # needs the query_logs:read scope
 bonsai cluster destroy search --confirm search
 ```
 
@@ -71,8 +71,8 @@ bonsai cluster destroy search --confirm search
 Use the URL in your app:
 
 ```sh
-export BONSAI_URL=$(bonsai url search)
-bonsai url search --write .env
+export BONSAI_URL=$(bonsai cluster url search)
+bonsai cluster url search --write .env
 ```
 
 `--write` sets `BONSAI_URL` in the file (`--env` names another variable), replacing the old line, without printing the URL. It writes only inside the current folder, refuses a file that git doesn't ignore or that is tracked, and leaves the file with mode 0600.
@@ -82,9 +82,9 @@ bonsai url search --write .env
 | Area | Commands |
 |---|---|
 | Account | `login`, `logout`, `whoami`, `doctor`, `version` |
-| Clusters | `clusters`, `cluster create`, `cluster show`, `cluster open`, `cluster rename`, `cluster resize`, `cluster destroy`, `cluster wait`, `history` |
-| Connecting | `url` |
-| Watching | `usage`, `metrics`, `queries` |
+| Clusters | `cluster list`, `cluster create`, `cluster show`, `cluster open`, `cluster rename`, `cluster resize`, `cluster destroy`, `cluster wait`, `cluster history` |
+| Connecting | `cluster url` |
+| Watching | `cluster usage`, `cluster metrics`, `cluster queries` |
 | Actions | `action show`, `wait` |
 | Catalogue | `plans`, `regions`, `spaces`, `releases` |
 | Anything else | `api`, `completion` |
@@ -109,9 +109,9 @@ It prints the API's response as it is, so it can print passwords. Paths take clu
 
 - **Tables** fit your terminal. They show the key columns, cut long text with `…`, and leave out the least important columns when space runs out. Add `-w`/`--wide` to see every column. Piped output is never cut.
 - **`--json`** prints the API's JSON, for scripts and `jq`. Control and bidirectional-text characters inside strings are escaped as `\uXXXX`, so they can't disturb your terminal.
-- **Messages and progress** go to stderr and data goes to stdout, so `$(bonsai url search)` captures only the URL.
+- **Messages and progress** go to stderr and data goes to stdout, so `$(bonsai cluster url search)` captures only the URL.
 - **Text from the API**, such as cluster names and search terms, is cleaned of terminal control characters before it's shown.
-- **Secrets.** Only `bonsai url` prints a cluster's password (`--write` puts it in a file instead), plus `bonsai api` when the API response includes one.
+- **Secrets.** Only `bonsai cluster url` prints a cluster's password (`--write` puts it in a file instead), plus `bonsai api` when the API response includes one.
 
 ## Scripting
 
@@ -119,7 +119,7 @@ Commands never prompt when stdin isn't a terminal, when `CI` is set, or with `--
 
 ```sh
 id=$(bonsai cluster create "ci-$RUN_ID" --plan sandbox --region aws-us-east-1 --json | jq -r .result.cluster)
-export BONSAI_URL=$(bonsai url "$id")
+export BONSAI_URL=$(bonsai cluster url "$id")
 run-tests
 bonsai cluster destroy "$id" --confirm "ci-$RUN_ID"
 ```

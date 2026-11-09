@@ -469,7 +469,11 @@ async fn wait_timeout_exits_9_with_the_resume_hint() {
 async fn usage_shows_the_plan_limits() {
     let env = Env::start().await;
     let (cluster, _) = create_cluster(&env, "used");
-    let out = env.authed().args(["usage", &cluster]).output().unwrap();
+    let out = env
+        .authed()
+        .args(["cluster", "usage", &cluster])
+        .output()
+        .unwrap();
     assert!(out.status.success(), "{}", stderr(&out));
     let text = stdout(&out);
     for want in ["Docs", "Shards", "Size", "Health"] {
@@ -480,7 +484,7 @@ async fn usage_shows_the_plan_limits() {
 
     let out = env
         .authed()
-        .args(["usage", &cluster, "--json"])
+        .args(["cluster", "usage", &cluster, "--json"])
         .output()
         .unwrap();
     assert!(out.status.success(), "{}", stderr(&out));
@@ -491,7 +495,7 @@ async fn usage_shows_the_plan_limits() {
 async fn usage_refuses_more_than_90_days() {
     let env = Env::start().await;
     env.authed()
-        .args(["usage", "anything", "--since", "91d"])
+        .args(["cluster", "usage", "anything", "--since", "91d"])
         .assert()
         .code(2)
         .stderr(predicate::str::contains("90 days"));
@@ -501,7 +505,11 @@ async fn usage_refuses_more_than_90_days() {
 async fn metrics_shows_typical_and_slowest_latency() {
     let env = Env::start().await;
     let (cluster, _) = create_cluster(&env, "measured");
-    let out = env.authed().args(["metrics", &cluster]).output().unwrap();
+    let out = env
+        .authed()
+        .args(["cluster", "metrics", &cluster])
+        .output()
+        .unwrap();
     assert!(out.status.success(), "{}", stderr(&out));
     let text = stdout(&out);
     for want in ["Requests", "5xx", "p50", "p95", "p99"] {
@@ -527,7 +535,7 @@ async fn metrics_shows_typical_and_slowest_latency() {
 
     let out = env
         .authed()
-        .args(["metrics", &cluster, "--json"])
+        .args(["cluster", "metrics", &cluster, "--json"])
         .output()
         .unwrap();
     assert!(out.status.success(), "{}", stderr(&out));
@@ -542,7 +550,7 @@ async fn metrics_unavailable() {
     for command in ["metrics", "usage"] {
         let started = Instant::now();
         env.authed()
-            .args([command, &cluster])
+            .args(["cluster", command, &cluster])
             .assert()
             .code(1)
             .stdout("")
@@ -562,7 +570,7 @@ async fn queries_sanitized() {
     // Every term, the hostile ones included.
     let out = env
         .authed()
-        .args(["queries", &cluster, "--top", "100"])
+        .args(["cluster", "queries", &cluster, "--top", "100"])
         .output()
         .unwrap();
     assert!(out.status.success(), "{}", stderr(&out));
@@ -581,7 +589,7 @@ async fn queries_sanitized() {
     let out = env
         .authed()
         .env("COLUMNS", "30")
-        .args(["queries", &cluster, "--top", "100"])
+        .args(["cluster", "queries", &cluster, "--top", "100"])
         .output()
         .unwrap();
     assert!(out.status.success(), "{}", stderr(&out));
@@ -596,7 +604,7 @@ async fn queries_sanitized() {
     let server = server_json(&env, &format!("/clusters/{cluster}/queries")).await;
     let out = env
         .authed()
-        .args(["queries", &cluster, "--json"])
+        .args(["cluster", "queries", &cluster, "--json"])
         .output()
         .unwrap();
     assert!(out.status.success(), "{}", stderr(&out));
@@ -662,7 +670,7 @@ async fn queries_top_limits_the_rows() {
     let (cluster, _) = create_cluster(&env, "few");
     let out = env
         .authed()
-        .args(["queries", &cluster, "--top", "3", "--json"])
+        .args(["cluster", "queries", &cluster, "--top", "3", "--json"])
         .output()
         .unwrap();
     assert!(out.status.success(), "{}", stderr(&out));
@@ -686,7 +694,7 @@ async fn queries_missing_scope() {
     drop(conn);
     env.bonsai()
         .env("BONSAI_TOKEN", &token)
-        .args(["queries", &cluster])
+        .args(["cluster", "queries", &cluster])
         .assert()
         .code(3)
         .stdout("")
@@ -700,13 +708,13 @@ async fn observe_takes_the_cluster_name_and_bonsai_cluster() {
     let env = Env::start().await;
     let (cluster, _) = create_cluster(&env, "by-name");
     env.authed()
-        .args(["queries", "by-name", "--top", "1", "--json"])
+        .args(["cluster", "queries", "by-name", "--top", "1", "--json"])
         .assert()
         .success();
     let out = env
         .authed()
         .env("BONSAI_CLUSTER", &cluster)
-        .args(["usage", "--json"])
+        .args(["cluster", "usage", "--json"])
         .output()
         .unwrap();
     assert!(out.status.success(), "{}", stderr(&out));
@@ -743,7 +751,7 @@ async fn usage_and_metrics_take_their_longest_range() {
     for (command, since) in [("usage", "90d"), ("metrics", "30d")] {
         let out = env
             .authed()
-            .args([command, &cluster, "--since", since, "--json"])
+            .args(["cluster", command, &cluster, "--since", since, "--json"])
             .output()
             .unwrap();
         assert!(out.status.success(), "{command}: {}", stderr(&out));
@@ -756,14 +764,18 @@ async fn queries_json_is_the_whole_list_without_top() {
     let (cluster, _) = create_cluster(&env, "all-terms");
     let out = env
         .authed()
-        .args(["queries", &cluster, "--json"])
+        .args(["cluster", "queries", &cluster, "--json"])
         .output()
         .unwrap();
     assert!(out.status.success(), "{}", stderr(&out));
     // The mock has 28 terms: more than the human default of 20.
     assert_eq!(stdout_json(&out)["queries"].as_array().unwrap().len(), 28);
 
-    let out = env.authed().args(["queries", &cluster]).output().unwrap();
+    let out = env
+        .authed()
+        .args(["cluster", "queries", &cluster])
+        .output()
+        .unwrap();
     assert!(out.status.success(), "{}", stderr(&out));
     // A header and 20 rows.
     assert_eq!(stdout(&out).lines().count(), 21, "{}", stdout(&out));
@@ -778,8 +790,8 @@ async fn a_closed_pipe_is_silent() {
     for args in [
         vec!["plans", "--json"],
         vec!["plans"],
-        vec!["queries", cluster.as_str(), "--json"],
-        vec!["queries", cluster.as_str()],
+        vec!["cluster", "queries", cluster.as_str(), "--json"],
+        vec!["cluster", "queries", cluster.as_str()],
     ] {
         let mut child = std_bonsai(&env.mock, env.cfg.path())
             .env("BONSAI_TOKEN", env.token())

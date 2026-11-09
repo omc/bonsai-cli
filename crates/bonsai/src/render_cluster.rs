@@ -165,7 +165,7 @@ fn named(name: &str, id: &str) -> String {
     format!("{name} ({id})")
 }
 
-/// `cluster show`'s key and value rows. No credentials: only `bonsai url` prints one.
+/// `cluster show`'s key and value rows. No credentials: only `bonsai cluster url` prints one.
 pub fn show_rows(c: &Cluster, now: Timestamp) -> Vec<(&'static str, String)> {
     let mut rows = vec![
         ("Name", c.name.clone()),

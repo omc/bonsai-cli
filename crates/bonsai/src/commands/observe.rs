@@ -1,4 +1,4 @@
-//! `bonsai usage`, `bonsai metrics` and `bonsai queries`.
+//! `bonsai cluster usage`, `cluster metrics` and `cluster queries`.
 //!
 //! `503 metrics_unavailable` comes straight back from the client (it isn't retried)
 //! and is told as "metrics are unavailable right now, try again in N s", exit 1;

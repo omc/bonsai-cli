@@ -4,7 +4,7 @@
 //! human output goes through [`sanitize`]. Colour is off when `NO_COLOR` is set,
 //! `TERM=dumb`, or the stream isn't a TTY (anstream decides the last per stream, and
 //! honours `CLICOLOR_FORCE`). Writes ignore errors, so a closed pipe
-//! (`bonsai clusters | head`) doesn't panic.
+//! (`bonsai cluster list | head`) doesn't panic.
 
 use std::borrow::Cow;
 use std::io::{IsTerminal, Write};
@@ -535,7 +535,7 @@ impl serde_json::ser::Formatter for EscapingFormatter {
 
 /// A stdout write's outcome for the command. A closed pipe (`bonsai api … | head`)
 /// is the reader's choice, so it isn't an error; any other failure (a full disk
-/// under `bonsai url > .env`) fails the command.
+/// under `bonsai cluster url > .env`) fails the command.
 fn finish(res: std::io::Result<()>) -> Result<()> {
     match res {
         Err(e) if e.kind() != std::io::ErrorKind::BrokenPipe => {

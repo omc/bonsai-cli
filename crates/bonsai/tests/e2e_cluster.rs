@@ -90,7 +90,11 @@ fn create(env: &Env, name: &str, plan: &str) -> String {
 
 /// `clusters --json`, as `(name, state)`.
 fn listed(env: &Env) -> Vec<(String, String)> {
-    let out = env.authed().args(["clusters", "--json"]).output().unwrap();
+    let out = env
+        .authed()
+        .args(["cluster", "list", "--json"])
+        .output()
+        .unwrap();
     assert!(out.status.success(), "{}", stderr(&out));
     stdout_json(&out)
         .as_array()
@@ -111,7 +115,7 @@ async fn ci_example() {
     let id = create(&env, "ci-1", "sandbox");
 
     env.authed()
-        .args(["url", &id])
+        .args(["cluster", "url", &id])
         .assert()
         .success()
         .stdout(predicate::str::is_match(r"^https://[^:]+:[^@]+@.+\n$").unwrap());
@@ -141,7 +145,7 @@ async fn create_human_output_names_the_host_and_url_command() {
         .success()
         .stderr(predicate::str::contains("✓ hello is ready  hello-"))
         .stderr(predicate::str::contains(
-            "\n  Connection URL (includes the password): run bonsai url hello\n",
+            "\n  Connection URL (includes the password): run bonsai cluster url hello\n",
         ))
         .stderr(predicate::str::contains("Reserving capacity"));
 }
@@ -391,7 +395,7 @@ async fn ambiguous_name() {
         .stderr(predicate::str::contains(&a))
         .stderr(predicate::str::contains(&b));
     env.authed()
-        .args(["url", "twin"])
+        .args(["cluster", "url", "twin"])
         .assert()
         .code(2)
         .stdout(predicate::str::is_empty());
@@ -467,16 +471,16 @@ async fn no_password_anywhere_but_url() {
     let password = password_of(&env, &id);
 
     let reads: [&[&str]; 12] = [
-        &["clusters"],
+        &["cluster", "list"],
         &["cluster", "list"],
         &["cluster", "show", &id],
         &["cluster", "show", "secret-1"],
         &["cluster", "history", &id],
         &["cluster", "history", &id, "--steps"],
         &["cluster", "wait", &id],
-        &["usage", &id],
-        &["metrics", &id],
-        &["queries", &id],
+        &["cluster", "usage", &id],
+        &["cluster", "metrics", &id],
+        &["cluster", "queries", &id],
         &["action", "show", &act],
         &["wait", &act],
     ];
@@ -491,7 +495,7 @@ async fn no_password_anywhere_but_url() {
     for extra in flags {
         let out = env
             .authed()
-            .arg("url")
+            .args(["cluster", "url"])
             .arg(&id)
             .args(extra)
             .output()
@@ -509,7 +513,7 @@ async fn no_password_anywhere_but_url() {
 fn listed_ids(env: &Env, name: &str) -> String {
     let out = env
         .authed()
-        .args(["clusters", "--name", name, "--json"])
+        .args(["cluster", "list", "--name", name, "--json"])
         .output()
         .unwrap();
     let v = stdout_json(&out);
@@ -556,12 +560,12 @@ async fn url_prints_the_default_credentials_unless_another_is_named() {
 
     // The first rw credential stays the default, as the dashboard shows it.
     env.authed()
-        .args(["url", &id])
+        .args(["cluster", "url", &id])
         .assert()
         .success()
         .stdout(format!("{first_url}\n"));
     env.authed()
-        .args(["url", &id, "--credential", &second])
+        .args(["cluster", "url", &id, "--credential", &second])
         .assert()
         .success()
         .stdout(format!("{second_url}\n"));
@@ -610,7 +614,7 @@ async fn bonsai_cluster_is_the_default_cluster() {
     assert_eq!(stdout_json(&out)["id"], id.as_str());
     env.authed()
         .env("BONSAI_CLUSTER", &id)
-        .arg("url")
+        .args(["cluster", "url"])
         .assert()
         .success()
         .stdout(predicate::str::starts_with("https://"));
@@ -651,6 +655,28 @@ async fn verbose_explains_the_404_before_a_name_lookup() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn cluster_commands_live_under_cluster_only() {
+    let env = Env::start().await;
+    let id = create(&env, "grouped", "sandbox");
+    for sub in ["url", "usage", "metrics", "queries", "history"] {
+        let out = env
+            .authed()
+            .args(["cluster", sub, &id, "--json"])
+            .output()
+            .unwrap();
+        assert!(out.status.success(), "cluster {sub}: {}", stderr(&out));
+    }
+    // The old shortcuts are gone, not aliases.
+    for old in ["clusters", "url", "usage", "metrics", "queries", "history"] {
+        env.authed()
+            .args([old, &id])
+            .assert()
+            .code(2)
+            .stdout(predicate::str::is_empty());
+    }
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn clusters_rides_out_a_429() {
     let env = Env::start().await;
     admin(
@@ -660,7 +686,11 @@ async fn clusters_rides_out_a_429() {
         json!(1),
     )
     .await;
-    let out = env.authed().args(["clusters", "--json"]).output().unwrap();
+    let out = env
+        .authed()
+        .args(["cluster", "list", "--json"])
+        .output()
+        .unwrap();
     assert!(out.status.success(), "{}", stderr(&out));
     assert_eq!(stdout_json(&out), json!([]));
 }
@@ -670,12 +700,12 @@ async fn url_env_prints_name_equals_url() {
     let env = Env::start().await;
     let id = create(&env, "dotenv", "sandbox");
     env.authed()
-        .args(["url", &id, "--env", "ELASTICSEARCH_URL"])
+        .args(["cluster", "url", &id, "--env", "ELASTICSEARCH_URL"])
         .assert()
         .success()
         .stdout(predicate::str::is_match(r"^ELASTICSEARCH_URL=https://[^:]+:[^@]+@.+\n$").unwrap());
     env.authed()
-        .args(["url", &id, "--env", "NOT A NAME"])
+        .args(["cluster", "url", &id, "--env", "NOT A NAME"])
         .assert()
         .code(2)
         .stdout(predicate::str::is_empty());
@@ -701,7 +731,7 @@ fn project() -> tempfile::TempDir {
 async fn url_write_sets_the_variable_in_an_ignored_file_without_printing_it() {
     let env = Env::start().await;
     let id = create(&env, "secret", "sandbox");
-    let printed = env.authed().args(["url", &id]).output().unwrap();
+    let printed = env.authed().args(["cluster", "url", &id]).output().unwrap();
     let url = String::from_utf8(printed.stdout).unwrap().trim().to_owned();
     let password = url::Url::parse(&url)
         .unwrap()
@@ -715,7 +745,7 @@ async fn url_write_sets_the_variable_in_an_ignored_file_without_printing_it() {
     let out = env
         .authed()
         .current_dir(dir.path())
-        .args(["url", "secret", "--write", ".env"])
+        .args(["cluster", "url", "secret", "--write", ".env"])
         .output()
         .unwrap();
     assert!(out.status.success(), "{}", stderr(&out));
@@ -736,7 +766,7 @@ async fn url_write_sets_the_variable_in_an_ignored_file_without_printing_it() {
         .authed()
         .current_dir(dir.path())
         .args([
-            "url", "secret", "--write", ".env", "--env", "ES_URL", "--json",
+            "cluster", "url", "secret", "--write", ".env", "--env", "ES_URL", "--json",
         ])
         .output()
         .unwrap();
@@ -758,7 +788,7 @@ async fn url_write_sets_the_variable_in_an_ignored_file_without_printing_it() {
     for path in [".env.local", "../.env", "/tmp/bonsai.env"] {
         env.authed()
             .current_dir(dir.path())
-            .args(["url", "secret", "--write", path])
+            .args(["cluster", "url", "secret", "--write", path])
             .assert()
             .code(2)
             .stdout(predicate::str::is_empty());
@@ -862,7 +892,9 @@ async fn list_filters_pass_through() {
     create(&env, "beta", "sandbox");
     let out = env
         .authed()
-        .args(["clusters", "--name", "alpha", "--state", "ready", "--json"])
+        .args([
+            "cluster", "list", "--name", "alpha", "--state", "ready", "--json",
+        ])
         .output()
         .unwrap();
     let v = stdout_json(&out);
@@ -939,7 +971,7 @@ async fn history_times_are_compact_unless_wide() {
         assert!(out.status.success(), "{}", stderr(&out));
         text(&out.stdout)
     };
-    let short = run(&["history", &id]);
+    let short = run(&["cluster", "history", &id]);
     assert!(short.starts_with("ACTION "), "{short}");
     assert!(!short.contains(" UTC"), "{short}");
     let row = short.lines().nth(1).unwrap();
@@ -948,7 +980,7 @@ async fn history_times_are_compact_unless_wide() {
     let narrow = env
         .authed()
         .env("COLUMNS", "60")
-        .args(["history", &id])
+        .args(["cluster", "history", &id])
         .output()
         .unwrap();
     let narrow = text(&narrow.stdout);
@@ -959,7 +991,7 @@ async fn history_times_are_compact_unless_wide() {
     assert_fits(&narrow, 60);
     // --wide adds STARTED AT, the full time; it's dropped first, so --wide never
     // shows fewer columns than the default.
-    let wide = run(&["history", &id, "--wide"]);
+    let wide = run(&["cluster", "history", &id, "--wide"]);
     assert!(wide.starts_with("ACTION "), "{wide}");
     assert!(
         wide.lines().next().unwrap().contains("STARTED AT"),
@@ -971,7 +1003,7 @@ async fn history_times_are_compact_unless_wide() {
             let out = env
                 .authed()
                 .env("COLUMNS", cols)
-                .args(["history", &id])
+                .args(["cluster", "history", &id])
                 .args(extra)
                 .output()
                 .unwrap();
@@ -989,9 +1021,9 @@ async fn history_times_are_compact_unless_wide() {
             "{cols}: {short:?} vs {wide:?}"
         );
     }
-    let steps = run(&["history", &id, "--steps"]);
+    let steps = run(&["cluster", "history", &id, "--steps"]);
     assert!(!steps.contains(" UTC"), "{steps}");
-    let steps = run(&["history", &id, "--steps", "-w"]);
+    let steps = run(&["cluster", "history", &id, "--steps", "-w"]);
     assert!(
         steps.lines().all(|l| l.is_empty() || l.contains(" UTC (")),
         "{steps}"
@@ -1175,7 +1207,7 @@ async fn clusters_fit_columns_and_keep_ids_whole() {
     let out = env
         .authed()
         .env("COLUMNS", "60")
-        .arg("clusters")
+        .args(["cluster", "list"])
         .output()
         .unwrap();
     assert!(out.status.success(), "{}", stderr(&out));
@@ -1206,7 +1238,7 @@ async fn clusters_fit_columns_and_keep_ids_whole() {
     let out = env
         .authed()
         .env("COLUMNS", "20")
-        .arg("clusters")
+        .args(["cluster", "list"])
         .output()
         .unwrap();
     let narrow = text(&out.stdout);
@@ -1231,7 +1263,10 @@ async fn clusters_default_and_wide_columns() {
             .collect::<Vec<_>>()
             .join(" ")
     };
-    assert_eq!(header(&["clusters"]), "NAME ID STATE PLAN REGION SIZE");
+    assert_eq!(
+        header(&["cluster", "list"]),
+        "NAME ID STATE PLAN REGION SIZE"
+    );
     assert_eq!(
         header(&["cluster", "list", "--wide"]),
         "NAME ID STATE PLAN REGION RELEASE DOCS SIZE"

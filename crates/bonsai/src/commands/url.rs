@@ -1,4 +1,4 @@
-//! `bonsai url`: the connection URL, password included, and nothing else. The only
+//! `bonsai cluster url`: the connection URL, password included, and nothing else. The only
 //! command that prints a secret; with `--write` it sets it in an env file instead.
 
 use anyhow::Result;

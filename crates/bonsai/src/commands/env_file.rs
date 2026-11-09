@@ -1,4 +1,4 @@
-//! The env file `bonsai url --write` and the MCP tool `write_cluster_url` write: a
+//! The env file `bonsai cluster url --write` and the MCP tool `write_cluster_url` write: a
 //! path inside the project that git ignores, and one `NAME=value` line in it.
 
 use std::io::ErrorKind;

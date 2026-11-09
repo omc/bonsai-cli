@@ -1,4 +1,4 @@
-//! `bonsai url`: the connection URL, with its password.
+//! `bonsai cluster url`: the connection URL, with its password.
 
 use bonsai_api::{Client, collect_pages};
 use secrecy::SecretString;

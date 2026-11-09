@@ -23,7 +23,7 @@ use bonsai_core::config::{Settings, resolve_settings};
 use secrecy::SecretString;
 use tokio_util::sync::CancellationToken;
 
-use crate::cli::{ClusterCommand, Command, Global};
+use crate::cli::{Command, Global};
 use crate::exit::{Interrupted, NotLoggedIn};
 use crate::output::Printer;
 
@@ -176,13 +176,7 @@ pub async fn run(command: Command, ctx: &Ctx) -> Result<()> {
         Command::Skill(command) => skill::run(ctx, command),
         Command::Mcp(args) => mcp::run(ctx, args).await,
         Command::Api(args) => ctx.abortable(api::api(ctx, args)).await,
-        Command::Clusters(args) => cluster::list(ctx, args).await,
         Command::Cluster(command) => cluster::run(ctx, command).await,
-        Command::History(args) => cluster::run(ctx, ClusterCommand::History(args)).await,
-        Command::Url(args) => url::url(ctx, args).await,
-        Command::Usage(args) => observe::usage(ctx, args).await,
-        Command::Metrics(args) => observe::metrics(ctx, args).await,
-        Command::Queries(args) => observe::queries(ctx, args).await,
         Command::Action(command) => action::run(ctx, command).await,
         Command::Wait(args) => action::wait(ctx, args).await,
         Command::Plans(args) => catalogue::plans(ctx, args).await,

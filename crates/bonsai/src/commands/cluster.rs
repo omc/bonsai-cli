@@ -1,4 +1,4 @@
-//! `bonsai clusters` and `bonsai cluster …`.
+//! `bonsai cluster …`.
 
 use std::time::Duration;
 
@@ -87,6 +87,10 @@ pub async fn run(ctx: &Ctx, command: ClusterCommand) -> Result<()> {
         }
         ClusterCommand::History(args) => history(ctx, args).await,
         ClusterCommand::Wait(args) => wait(ctx, args).await,
+        ClusterCommand::Url(args) => super::url::url(ctx, args).await,
+        ClusterCommand::Usage(args) => super::observe::usage(ctx, args).await,
+        ClusterCommand::Metrics(args) => super::observe::metrics(ctx, args).await,
+        ClusterCommand::Queries(args) => super::observe::queries(ctx, args).await,
     }
 }
 
@@ -257,7 +261,7 @@ async fn create(ctx: &Ctx, args: CreateArgs, idempotency_key: Option<String>) ->
     let ready = format!("{} is ready  {host}", args.name);
     ctx.out.success(ready.trim_end());
     ctx.out.info(&format!(
-        "  Connection URL (includes the password): run bonsai url {}",
+        "  Connection URL (includes the password): run bonsai cluster url {}",
         shell_quote(&args.name)
     ));
     Ok(())
