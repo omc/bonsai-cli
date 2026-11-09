@@ -80,7 +80,7 @@ pub const COVERAGE: &[(&str, &[&str])] = &[
     ("createClusterCredential", &[]),
     ("getClusterCredential", &["url", "mcp"]),
     ("revokeClusterCredential", &[]),
-    ("listPlans", &["plans", "cluster create", "mcp"]),
+    ("listPlans", &["regions", "plans", "cluster create", "mcp"]),
     // `cluster create --plan` asks only among the plan's regions.
     ("getPlan", &["cluster resize", "cluster create"]),
     ("listRegions", &["regions", "cluster create", "mcp"]),

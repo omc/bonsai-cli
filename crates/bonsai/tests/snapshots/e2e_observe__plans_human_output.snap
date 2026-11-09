@@ -2,35 +2,35 @@
 source: crates/bonsai/tests/e2e_observe.rs
 expression: stdout(&out)
 ---
-ID                              NAME                        PRICE      TENANCY
-business-2x                     Business 2X                 $2,500/mo  single
-business-2x-esplat              Business 2X                 $3,000/mo  single
-business-capacity-2x            Business Capacity 2X        $4,000/mo  single
-business-capacity-2x-esplat     Business Capacity 2X        $4,800/mo  single
-business-capacity-lg            Business Capacity Large     $1,000/mo  single
-business-capacity-lg-esplat     Business Capacity Large     $1,200/mo  single
-business-capacity-xl            Business Capacity XL        $2,000/mo  single
-business-capacity-xl-esplat     Business Capacity XL        $2,400/mo  single
-business-lg                     Business Large              $650/mo    single
-business-lg-esplat              Business Large              $780/mo    single
-business-memory-2x              Business Memory 2X          $2,950/mo  single
-business-performance-2x         Business Performance 2X     $1,700/mo  single
-business-performance-2x-esplat  Business Performance 2X     $2,040/mo  single
-business-performance-4x         Business Performance 4X     $3,400/mo  single
-business-performance-4x-esplat  Business Performance 4X     $4,080/mo  single
-business-performance-8x         Business Performance 8X     $6,800/mo  single
-business-performance-8x-esplat  Business Performance 8X     $8,160/mo  single
-business-performance-lg         Business Performance Large  $600/mo    single
-business-performance-lg-esplat  Business Performance Large  $720/mo    single
-business-performance-xl         Business Performance XL     $850/mo    single
-business-performance-xl-esplat  Business Performance XL     $1,020/mo  single
-business-xl                     Business XL                 $1,300/mo  single
-business-xl-esplat              Business XL                 $1,560/mo  single
-sandbox                         Sandbox                     Free       shared
-staging                         Staging                     $15/mo     shared
-standard-birch                  Standard Birch              $90/mo     shared
-standard-cork                   Standard Cork               $150/mo    shared
-standard-elm                    Standard Elm                $50/mo     shared
-standard-fir                    Standard Fir                $20/mo     shared
-standard-oak                    Standard Oak                $400/mo    shared
-standard-teak                   Standard Teak               $250/mo    shared
+ID                              NAME                        PRICE      TENANCY  REGIONS
+business-2x                     Business 2X                 $2,500/mo  single   aws-ap-southeast-2, aws-eu-central-1, aws-eu-west-1, aws-us-east-1, aws-us-west-2, gcp-us-east4
+business-2x-esplat              Business 2X                 $3,000/mo  single   aws-ap-southeast-2, aws-eu-central-1, aws-eu-west-1, aws-us-east-1, aws-us-west-2, gcp-us-east4
+business-capacity-2x            Business Capacity 2X        $4,000/mo  single   aws-ap-southeast-2, aws-eu-central-1, aws-eu-west-1, aws-us-east-1, aws-us-west-2, gcp-us-east4
+business-capacity-2x-esplat     Business Capacity 2X        $4,800/mo  single   aws-ap-southeast-2, aws-eu-central-1, aws-eu-west-1, aws-us-east-1, aws-us-west-2, gcp-us-east4
+business-capacity-lg            Business Capacity Large     $1,000/mo  single   aws-ap-southeast-2, aws-eu-central-1, aws-eu-west-1, aws-us-east-1, aws-us-west-2, gcp-us-east4
+business-capacity-lg-esplat     Business Capacity Large     $1,200/mo  single   aws-ap-southeast-2, aws-eu-central-1, aws-eu-west-1, aws-us-east-1, aws-us-west-2, gcp-us-east4
+business-capacity-xl            Business Capacity XL        $2,000/mo  single   aws-ap-southeast-2, aws-eu-central-1, aws-eu-west-1, aws-us-east-1, aws-us-west-2, gcp-us-east4
+business-capacity-xl-esplat     Business Capacity XL        $2,400/mo  single   aws-ap-southeast-2, aws-eu-central-1, aws-eu-west-1, aws-us-east-1, aws-us-west-2, gcp-us-east4
+business-lg                     Business Large              $650/mo    single   aws-ap-southeast-2, aws-eu-central-1, aws-eu-west-1, aws-us-east-1, aws-us-west-2, gcp-us-east4
+business-lg-esplat              Business Large              $780/mo    single   aws-ap-southeast-2, aws-eu-central-1, aws-eu-west-1, aws-us-east-1, aws-us-west-2, gcp-us-east4
+business-memory-2x              Business Memory 2X          $2,950/mo  single   aws-ap-southeast-2, aws-eu-central-1, aws-eu-west-1, aws-us-east-1, aws-us-west-2, gcp-us-east4
+business-performance-2x         Business Performance 2X     $1,700/mo  single   aws-ap-southeast-2, aws-eu-central-1, aws-eu-west-1, aws-us-east-1, aws-us-west-2, gcp-us-east4
+business-performance-2x-esplat  Business Performance 2X     $2,040/mo  single   aws-ap-southeast-2, aws-eu-central-1, aws-eu-west-1, aws-us-east-1, aws-us-west-2, gcp-us-east4
+business-performance-4x         Business Performance 4X     $3,400/mo  single   aws-ap-southeast-2, aws-eu-central-1, aws-eu-west-1, aws-us-east-1, aws-us-west-2, gcp-us-east4
+business-performance-4x-esplat  Business Performance 4X     $4,080/mo  single   aws-ap-southeast-2, aws-eu-central-1, aws-eu-west-1, aws-us-east-1, aws-us-west-2, gcp-us-east4
+business-performance-8x         Business Performance 8X     $6,800/mo  single   aws-ap-southeast-2, aws-eu-central-1, aws-eu-west-1, aws-us-east-1, aws-us-west-2, gcp-us-east4
+business-performance-8x-esplat  Business Performance 8X     $8,160/mo  single   aws-ap-southeast-2, aws-eu-central-1, aws-eu-west-1, aws-us-east-1, aws-us-west-2, gcp-us-east4
+business-performance-lg         Business Performance Large  $600/mo    single   aws-ap-southeast-2, aws-eu-central-1, aws-eu-west-1, aws-us-east-1, aws-us-west-2, gcp-us-east4
+business-performance-lg-esplat  Business Performance Large  $720/mo    single   aws-ap-southeast-2, aws-eu-central-1, aws-eu-west-1, aws-us-east-1, aws-us-west-2, gcp-us-east4
+business-performance-xl         Business Performance XL     $850/mo    single   aws-ap-southeast-2, aws-eu-central-1, aws-eu-west-1, aws-us-east-1, aws-us-west-2, gcp-us-east4
+business-performance-xl-esplat  Business Performance XL     $1,020/mo  single   aws-ap-southeast-2, aws-eu-central-1, aws-eu-west-1, aws-us-east-1, aws-us-west-2, gcp-us-east4
+business-xl                     Business XL                 $1,300/mo  single   aws-ap-southeast-2, aws-eu-central-1, aws-eu-west-1, aws-us-east-1, aws-us-west-2, gcp-us-east4
+business-xl-esplat              Business XL                 $1,560/mo  single   aws-ap-southeast-2, aws-eu-central-1, aws-eu-west-1, aws-us-east-1, aws-us-west-2, gcp-us-east4
+sandbox                         Sandbox                     Free       shared   aws-us-east-1
+staging                         Staging                     $15/mo     shared   aws-us-east-1
+standard-birch                  Standard Birch              $90/mo     shared   aws-ap-southeast-2, aws-eu-central-1, aws-eu-west-1, aws-us-east-1, aws-us-west-2
+standard-cork                   Standard Cork               $150/mo    shared   aws-ap-southeast-2, aws-eu-central-1, aws-eu-west-1, aws-us-east-1, aws-us-west-2
+standard-elm                    Standard Elm                $50/mo     shared   aws-ap-southeast-2, aws-eu-central-1, aws-eu-west-1, aws-us-east-1, aws-us-west-2
+standard-fir                    Standard Fir                $20/mo     shared   aws-ap-southeast-2, aws-eu-central-1, aws-eu-west-1, aws-us-east-1, aws-us-west-2
+standard-oak                    Standard Oak                $400/mo    shared   aws-ap-southeast-2, aws-eu-central-1, aws-eu-west-1, aws-us-east-1, aws-us-west-2
+standard-teak                   Standard Teak               $250/mo    shared   aws-ap-southeast-2, aws-eu-central-1, aws-eu-west-1, aws-us-east-1, aws-us-west-2

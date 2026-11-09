@@ -154,6 +154,61 @@ async fn regions_human_output() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn regions_plan_lists_where_the_plan_is_offered() {
+    let env = Env::start().await;
+    let json = |args: &[&str]| {
+        let out = env.authed().args(args).arg("--json").output().unwrap();
+        assert!(out.status.success(), "{}", stderr(&out));
+        stdout_json(&out)
+    };
+    let plans = json(&["plans"]);
+    let sandbox = plans
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|p| p["id"] == "sandbox")
+        .unwrap();
+    let mut want: Vec<&str> = sandbox["regions"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|r| r.as_str().unwrap())
+        .collect();
+    want.sort_unstable();
+    let all = json(&["regions"]);
+    assert!(all.as_array().unwrap().len() > want.len(), "a real filter");
+
+    let got = json(&["regions", "--plan", "sandbox"]);
+    let mut ids: Vec<&str> = got
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|r| r["id"].as_str().unwrap())
+        .collect();
+    ids.sort_unstable();
+    assert_eq!(ids, want);
+    // Each item is the region as the API sent it.
+    let full = all.as_array().unwrap();
+    for r in got.as_array().unwrap() {
+        assert!(full.contains(r), "{r}");
+    }
+
+    assert_eq!(json(&["regions", "--plan", "no-such-plan"]), json!([]));
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn plans_show_regions_unless_one_is_given() {
+    let env = Env::start().await;
+    let header = |args: &[&str]| {
+        let out = env.authed().args(args).output().unwrap();
+        assert!(out.status.success(), "{}", stderr(&out));
+        stdout(&out).lines().next().unwrap().to_owned()
+    };
+    assert!(header(&["plans"]).contains("REGIONS"));
+    assert!(!header(&["plans", "--region", "aws-us-east-1"]).contains("REGIONS"));
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn releases_human_output() {
     let env = Env::start().await;
     let out = env.authed().arg("releases").output().unwrap();

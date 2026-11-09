@@ -88,7 +88,7 @@ pub enum Command {
     /// Plans this account may use
     Plans(PlansArgs),
     /// Regions open for new clusters
-    Regions(WideArgs),
+    Regions(RegionsArgs),
     /// The account's private spaces
     Spaces(WideArgs),
     /// Releases this account may use
@@ -379,6 +379,16 @@ pub struct PlansArgs {
     pub wide: bool,
 }
 
+#[derive(Debug, Args)]
+pub struct RegionsArgs {
+    /// Only regions where this plan is offered
+    #[arg(long, value_name = "P")]
+    pub plan: Option<String>,
+    /// Show every column
+    #[arg(long, short)]
+    pub wide: bool,
+}
+
 /// A list's flags when it has no filters.
 #[derive(Debug, Args)]
 pub struct WideArgs {
@@ -517,7 +527,8 @@ mod tests {
             Command::Queries(a) => a.wide,
             Command::Plans(a) => a.wide,
             Command::Releases(a) => a.wide,
-            Command::Regions(a) | Command::Spaces(a) => a.wide,
+            Command::Regions(a) => a.wide,
+            Command::Spaces(a) => a.wide,
             _ => unreachable!(),
         };
         for cmd in [

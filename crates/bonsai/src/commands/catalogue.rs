@@ -8,7 +8,7 @@ use bonsai_api::{ApiError, Page, Plan, Release, Response, collect_pages};
 use serde_json::Value;
 
 use super::Ctx;
-use crate::cli::{EngineArg, PlansArgs, ReleasesArgs, WideArgs};
+use crate::cli::{EngineArg, PlansArgs, RegionsArgs, ReleasesArgs, WideArgs};
 use crate::display::plan_price;
 use crate::output::Column;
 
@@ -21,6 +21,9 @@ const PLAN_COLUMNS: [Column; 7] = [
     Column::text("REGIONS", 1).wide(),
     Column::text("RELEASES", 1).wide(),
 ];
+
+/// `PLAN_COLUMNS`' REGIONS.
+const REGIONS: usize = 5;
 
 const REGION_COLUMNS: [Column; 4] = [
     Column::key("ID"),
@@ -68,7 +71,13 @@ pub async fn plans(ctx: &Ctx, args: PlansArgs) -> Result<()> {
                 ]
             })
             .collect();
-        ctx.out.table(&PLAN_COLUMNS, rows, args.wide)
+        // Without --region, where each plan is offered is the question; with it,
+        // the answer is in the command line.
+        let mut columns = PLAN_COLUMNS;
+        if args.region.is_none() {
+            columns[REGIONS] = Column::text("REGIONS", 1);
+        }
+        ctx.out.table(&columns, rows, args.wide)
     })
     .await
 }
@@ -85,12 +94,25 @@ fn plan_matches(plan: &Plan, region: Option<&str>, release: Option<&str>) -> boo
     }
 }
 
-pub async fn regions(ctx: &Ctx, args: WideArgs) -> Result<()> {
+pub async fn regions(ctx: &Ctx, args: RegionsArgs) -> Result<()> {
     ctx.abortable(async {
         let a = ctx.authed().await?;
         let client = &a.client;
         let (regions, raw) =
             all(|c| async move { client.list_regions(c.as_deref()).await }).await?;
+        let (regions, raw) = match &args.plan {
+            None => (regions, raw),
+            Some(plan) => {
+                let (plans, _) =
+                    all(|c| async move { client.list_plans(c.as_deref()).await }).await?;
+                let offered: Vec<String> = plans
+                    .into_iter()
+                    .find(|p| &p.id == plan)
+                    .map(|p| p.regions)
+                    .unwrap_or_default();
+                filter(regions, raw, |r| offered.contains(&r.id))
+            }
+        };
         if ctx.out.is_json() {
             return ctx.out.json(&Value::Array(raw));
         }
