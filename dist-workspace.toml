@@ -28,6 +28,7 @@ install-updater = true
 # dist's default for this target, macos-14, was retired on 2026-11-02.
 [dist.github-custom-runners]
 aarch64-apple-darwin = "macos-15"
+global = "runs-on=${{ github.run_id }}/cpu=2/family=c7i+m7i/image=ubuntu24-full-x64"
 
 # ci-green reads ci's runs. release.yml grants only `contents` otherwise.
 [dist.github-custom-job-permissions]
