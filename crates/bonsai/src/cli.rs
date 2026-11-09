@@ -299,9 +299,14 @@ pub struct UrlArgs {
     /// dashboard shows)
     #[arg(long, value_name = "ID")]
     pub credential: Option<String>,
-    /// Print NAME=<url>, for .env files or eval
+    /// Print NAME=<url>, for .env files or eval; with --write, the variable to set
     #[arg(long, value_name = "NAME")]
     pub env: Option<String>,
+    /// Set the variable (--env's, or BONSAI_URL) in this file instead of printing the
+    /// URL. The file must be inside the current folder and, in a git repository,
+    /// ignored by git; it's left readable only by you
+    #[arg(long, value_name = "FILE")]
+    pub write: Option<String>,
 }
 
 #[derive(Debug, Args)]

@@ -653,6 +653,91 @@ async fn url_env_prints_name_equals_url() {
         .stdout(predicate::str::is_empty());
 }
 
+/// A git repository that ignores `.env`.
+fn project() -> tempfile::TempDir {
+    let dir = tempfile::tempdir().unwrap();
+    let ok = std::process::Command::new("git")
+        .args(["init", "-q"])
+        .current_dir(dir.path())
+        .env("GIT_CONFIG_GLOBAL", "/dev/null")
+        .env("GIT_CONFIG_NOSYSTEM", "1")
+        .status()
+        .unwrap()
+        .success();
+    assert!(ok, "git init");
+    std::fs::write(dir.path().join(".gitignore"), ".env\n").unwrap();
+    dir
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn url_write_sets_the_variable_in_an_ignored_file_without_printing_it() {
+    let env = Env::start().await;
+    let id = create(&env, "secret", "sandbox");
+    let printed = env.authed().args(["url", &id]).output().unwrap();
+    let url = String::from_utf8(printed.stdout).unwrap().trim().to_owned();
+    let password = url::Url::parse(&url)
+        .unwrap()
+        .password()
+        .unwrap()
+        .to_owned();
+    let dir = project();
+    let dotenv = dir.path().join(".env");
+    std::fs::write(&dotenv, "KEEP=1\nBONSAI_URL=old\n").unwrap();
+
+    let out = env
+        .authed()
+        .current_dir(dir.path())
+        .args(["url", "secret", "--write", ".env"])
+        .output()
+        .unwrap();
+    assert!(out.status.success(), "{}", stderr(&out));
+    assert!(out.stdout.is_empty(), "printed: {:?}", out.stdout);
+    assert!(!stderr(&out).contains(&password), "{}", stderr(&out));
+    assert_eq!(
+        std::fs::read_to_string(&dotenv).unwrap(),
+        format!("KEEP=1\nBONSAI_URL={url}\n")
+    );
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let mode = std::fs::metadata(&dotenv).unwrap().permissions().mode();
+        assert_eq!(mode & 0o777, 0o600);
+    }
+
+    let out = env
+        .authed()
+        .current_dir(dir.path())
+        .args([
+            "url", "secret", "--write", ".env", "--env", "ES_URL", "--json",
+        ])
+        .output()
+        .unwrap();
+    assert!(out.status.success(), "{}", stderr(&out));
+    let v = stdout_json(&out);
+    assert_eq!(v["path"], ".env");
+    assert_eq!(v["variable"], "ES_URL");
+    assert_eq!(v["replaced"], false);
+    assert!(v["url"].as_str().unwrap().contains("****"), "{v}");
+    assert!(!v.to_string().contains(&password), "{v}");
+    assert!(
+        std::fs::read_to_string(&dotenv)
+            .unwrap()
+            .ends_with(&format!("ES_URL={url}\n"))
+    );
+
+    // Refused before the URL is fetched: a file git doesn't ignore, or one outside
+    // the folder.
+    for path in [".env.local", "../.env", "/tmp/bonsai.env"] {
+        env.authed()
+            .current_dir(dir.path())
+            .args(["url", "secret", "--write", path])
+            .assert()
+            .code(2)
+            .stdout(predicate::str::is_empty());
+    }
+    assert!(!dir.path().join(".env.local").exists());
+}
+
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn wait_timeout() {
     let env = slow_env().await;

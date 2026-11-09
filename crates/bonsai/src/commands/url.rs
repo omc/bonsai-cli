@@ -1,12 +1,12 @@
 //! `bonsai url`: the connection URL, password included, and nothing else. The only
-//! command that prints a secret.
+//! command that prints a secret; with `--write` it sets it in an env file instead.
 
 use anyhow::Result;
 use bonsai_core::{CoreError, connection_url};
 use secrecy::{ExposeSecret, SecretString};
 
-use super::Ctx;
 use super::cluster::resolve;
+use super::{Ctx, chain, env_file};
 use crate::cli::UrlArgs;
 
 pub async fn url(ctx: &Ctx, args: UrlArgs) -> Result<()> {
@@ -18,14 +18,43 @@ pub async fn url(ctx: &Ctx, args: UrlArgs) -> Result<()> {
         ))
         .into());
     }
+    // Checked before the URL is fetched, so a refusal never holds the secret.
+    let target = match &args.write {
+        Some(path) => {
+            let root = std::env::current_dir()?;
+            let target = env_file::Target::check(&root, path)
+                .map_err(|e| CoreError::Usage(format!("--write: {}", chain(e))))?;
+            Some((root, target))
+        }
+        None => None,
+    };
     let a = ctx.authed().await?;
     let cluster = resolve(ctx, &a.client, &args.cluster.cluster).await?.value;
     let credential = args.credential.as_deref();
     let url = ctx
         .abortable(async { Ok(connection_url(&a.client, &cluster.id, credential).await?) })
         .await?;
-    // Written raw: the URL is the data, and sanitizing it would change it.
-    ctx.out.data_line(&line(args.env.as_deref(), &url))
+    let Some((root, target)) = target else {
+        // Written raw: the URL is the data, and sanitizing it would change it.
+        return ctx.out.data_line(&line(args.env.as_deref(), &url));
+    };
+    let var = args.env.as_deref().unwrap_or(env_file::DEFAULT_VAR);
+    let written = target.write(&root, var, &url)?;
+    if ctx.out.is_json() {
+        return ctx.out.json(&serde_json::json!({
+            "path": written.path,
+            "variable": var,
+            "url": written.redacted,
+            "replaced": written.replaced,
+        }));
+    }
+    let how = if written.replaced {
+        "Replaced"
+    } else {
+        "Added"
+    };
+    ctx.out.success(&format!("{how} {var} in {}", written.path));
+    Ok(())
 }
 
 /// `url`, or `NAME=url` with `--env NAME`.
