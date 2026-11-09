@@ -12,7 +12,7 @@ on:
 
 jobs:
   check:
-    runs-on: ubuntu-24.04
+    runs-on: "runs-on=${{ github.run_id }}-ci-green/cpu=2/family=c7i+m7i/image=ubuntu24-full-x64"
     env:
       GH_TOKEN: ${{ github.token }}
     steps:
