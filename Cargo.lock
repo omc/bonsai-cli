@@ -428,7 +428,7 @@ dependencies = [
 
 [[package]]
 name = "bonsai"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anstream",
  "anyhow",
@@ -470,7 +470,7 @@ dependencies = [
 
 [[package]]
 name = "bonsai-api"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "bonsai-contract",
  "jiff",
@@ -493,7 +493,7 @@ dependencies = [
 
 [[package]]
 name = "bonsai-contract"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "jsonschema",
  "serde_json",
@@ -503,7 +503,7 @@ dependencies = [
 
 [[package]]
 name = "bonsai-core"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "apple-native-keyring-store",
  "bonsai-api",
@@ -529,7 +529,7 @@ dependencies = [
 
 [[package]]
 name = "bonsai-mock"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "axum",
