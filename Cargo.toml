@@ -60,6 +60,9 @@ test-case = "3"
 tempfile = "3"
 predicates = "3"
 libc = "0.2"
+# The MCP server behind `bonsai mcp`: stdio only, no HTTP transport.
+rmcp = { version = "3.9", default-features = false, features = ["server", "macros", "transport-io"] }
+schemars = "1"
 
 [profile.release]
 lto = "fat"

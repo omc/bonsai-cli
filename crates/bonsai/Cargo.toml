@@ -43,6 +43,8 @@ jiff.workspace = true
 reqwest.workspace = true
 url.workspace = true
 semver.workspace = true
+rmcp.workspace = true
+schemars.workspace = true
 
 [dev-dependencies]
 bonsai-contract = { path = "../bonsai-contract" }
