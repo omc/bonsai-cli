@@ -142,11 +142,11 @@ claude mcp add bonsai -- bonsai mcp
 
 Add `--scope user` to have it in every project. Other clients (Claude Desktop, Cursor, VS Code) take the usual `mcpServers` entry: `{"bonsai": {"command": "bonsai", "args": ["mcp"]}}`. Where there's no keychain, as in a container, set `BONSAI_TOKEN` in the entry's `env`.
 
-Its tools mirror the commands: `list_clusters`, `get_cluster`, `cluster_history`, `usage`, `metrics`, `top_queries`, `list_plans`, `list_regions`, `list_spaces`, `list_releases`, `whoami`, `get_action`, `wait_action`, and to change things `create_cluster`, `rename_cluster`, `resize_cluster` and `destroy_cluster`. Each returns the API's JSON, as `--json` prints it.
+Its tools are named after the API's operations: `list_clusters`, `get_cluster`, `list_cluster_actions`, `get_cluster_usage`, `get_cluster_metrics`, `get_cluster_top_queries`, `list_plans`, `list_regions`, `list_spaces`, `list_releases`, `whoami`, `get_action`, `wait_action`, and to change things `create_cluster`, `rename_cluster`, `resize_cluster` and `destroy_cluster`. Each returns the API's JSON, as `--json` prints it.
 
 - **Changes.** `create_cluster`, `resize_cluster` and `destroy_cluster` return the Action at once; the agent follows it with `wait_action`, which waits up to five minutes per call. `destroy_cluster` needs `confirm` set to the cluster's current name. `bonsai mcp --read-only` leaves out the tools that change clusters.
 - **Passwords.** No tool returns one. `write_cluster_url` writes the connection URL to an env file in the project (`.env` and `BONSAI_URL` by default) and answers with the password as `****`. It writes only below the folder the server started in, and refuses a file that git doesn't ignore or that is tracked, so the password can't be committed. The file is left with mode 0600.
-- **Search terms.** `top_queries` returns what your cluster's users typed. It is data, and the tool says so to the agent, but treat it as untrusted text.
+- **Search terms.** `get_cluster_top_queries` returns what your cluster's users typed. It is data, and the tool says so to the agent, but treat it as untrusted text.
 
 ### Exit codes
 

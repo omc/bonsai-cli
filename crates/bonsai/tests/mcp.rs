@@ -185,17 +185,17 @@ fn password_of(env: &Env, cluster_id: &str) -> String {
 }
 
 const READ_TOOLS: [&str; 14] = [
-    "cluster_history",
     "get_action",
     "get_cluster",
+    "get_cluster_metrics",
+    "get_cluster_top_queries",
+    "get_cluster_usage",
+    "list_cluster_actions",
     "list_clusters",
     "list_plans",
     "list_regions",
     "list_releases",
     "list_spaces",
-    "metrics",
-    "top_queries",
-    "usage",
     "wait_action",
     "whoami",
     "write_cluster_url",
@@ -275,11 +275,14 @@ async fn reads_clusters_and_the_catalogue() {
     let regions = mcp.call_json("list_regions", json!({}));
     assert!(!regions.as_array().unwrap().is_empty());
 
-    let history = mcp.call_json("cluster_history", json!({ "cluster": id }));
+    let history = mcp.call_json("list_cluster_actions", json!({ "cluster": id }));
     assert!(!history.as_array().unwrap().is_empty(), "{history}");
-    let usage = mcp.call_json("usage", json!({ "cluster": id, "since": "7d" }));
+    let usage = mcp.call_json("get_cluster_usage", json!({ "cluster": id, "since": "7d" }));
     assert!(usage.is_object(), "{usage}");
-    let metrics = mcp.call_json("metrics", json!({ "cluster": id, "since": "1h" }));
+    let metrics = mcp.call_json(
+        "get_cluster_metrics",
+        json!({ "cluster": id, "since": "1h" }),
+    );
     assert!(metrics.is_object(), "{metrics}");
 }
 

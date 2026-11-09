@@ -36,7 +36,7 @@ use crate::sanitize::sanitize;
 /// What `wait_action` waits by default, and at most.
 const WAIT_DEFAULT: Duration = Duration::from_secs(60);
 const WAIT_MAX: Duration = Duration::from_secs(300);
-/// `cluster_history`'s default and largest `limit`; 100 is the contract's page cap.
+/// `list_cluster_actions`' default and largest `limit`; 100 is the contract's page cap.
 const HISTORY_DEFAULT: u32 = 20;
 const HISTORY_MAX: u32 = 100;
 
@@ -259,7 +259,7 @@ impl Server {
         description = "A cluster's Actions (create, resize, destroy...), newest first",
         annotations(read_only_hint = true, open_world_hint = false)
     )]
-    async fn cluster_history(
+    async fn list_cluster_actions(
         &self,
         Parameters(p): Parameters<HistoryParams>,
     ) -> Result<CallToolResult, ErrorData> {
@@ -309,7 +309,7 @@ impl Server {
         description = "A cluster's docs, shards and size against its plan's limits, over time",
         annotations(read_only_hint = true, open_world_hint = false)
     )]
-    async fn usage(
+    async fn get_cluster_usage(
         &self,
         Parameters(p): Parameters<RangeParams>,
     ) -> Result<CallToolResult, ErrorData> {
@@ -333,7 +333,7 @@ impl Server {
         description = "A cluster's request rates, errors, traffic and latency, over time",
         annotations(read_only_hint = true, open_world_hint = false)
     )]
-    async fn metrics(
+    async fn get_cluster_metrics(
         &self,
         Parameters(p): Parameters<MetricsParams>,
     ) -> Result<CallToolResult, ErrorData> {
@@ -359,7 +359,7 @@ impl Server {
                        Needs a token with the query_logs:read scope.",
         annotations(read_only_hint = true, open_world_hint = false)
     )]
-    async fn top_queries(
+    async fn get_cluster_top_queries(
         &self,
         Parameters(p): Parameters<QueriesParams>,
     ) -> Result<CallToolResult, ErrorData> {
