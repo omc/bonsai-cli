@@ -6,6 +6,7 @@ mod api;
 mod auth;
 mod catalogue;
 mod cluster;
+mod env_file;
 mod mcp;
 mod misc;
 mod observe;

@@ -7,8 +7,6 @@
 //! `write_cluster_url` puts the connection URL in a git-ignored env file and
 //! answers with the URL redacted.
 
-mod env_file;
-
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
@@ -30,7 +28,7 @@ use serde::Deserialize;
 use serde_json::Value;
 use tokio_util::sync::CancellationToken;
 
-use super::{Ctx, chain};
+use super::{Ctx, chain, env_file};
 use crate::cli::{McpArgs, parse_duration};
 use crate::exit::Interrupted;
 use crate::sanitize::sanitize;
@@ -41,8 +39,6 @@ const WAIT_MAX: Duration = Duration::from_secs(300);
 /// `cluster_history`'s default and largest `limit`; 100 is the contract's page cap.
 const HISTORY_DEFAULT: u32 = 20;
 const HISTORY_MAX: u32 = 100;
-const ENV_FILE: &str = ".env";
-const ENV_VAR: &str = "BONSAI_URL";
 
 pub async fn run(ctx: &Ctx, args: McpArgs) -> Result<()> {
     let a = ctx.authed().await?;
@@ -604,14 +600,14 @@ impl Server {
     }
 
     async fn write_url(&self, p: UrlParams) -> Result<Value> {
-        let variable = p.variable.as_deref().unwrap_or(ENV_VAR);
+        let variable = p.variable.as_deref().unwrap_or(env_file::DEFAULT_VAR);
         if !super::url::is_env_name(variable) {
             return Err(CoreError::Usage(format!(
                 "{variable:?} isn't a variable name (letters, digits and _, not starting with a digit)"
             ))
             .into());
         }
-        let path = p.path.as_deref().unwrap_or(ENV_FILE);
+        let path = p.path.as_deref().unwrap_or(env_file::DEFAULT_FILE);
         // Checked before the URL is fetched, so a refusal never holds the secret.
         let target = env_file::Target::check(&self.inner.root, path)?;
         let cluster = self.cluster(&p.cluster).await?;

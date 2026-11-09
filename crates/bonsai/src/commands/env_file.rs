@@ -1,5 +1,5 @@
-//! `write_cluster_url`'s env file: a path inside the project that git ignores, and
-//! one `NAME=value` line in it.
+//! The env file `bonsai url --write` and the MCP tool `write_cluster_url` write: a
+//! path inside the project that git ignores, and one `NAME=value` line in it.
 
 use std::io::ErrorKind;
 use std::path::{Component, Path, PathBuf};
@@ -8,6 +8,10 @@ use std::process::Command;
 use anyhow::{Context, Result, bail};
 use secrecy::{ExposeSecret, SecretString};
 use url::Url;
+
+/// The MCP tool's file, and the variable both write by default.
+pub const DEFAULT_FILE: &str = ".env";
+pub const DEFAULT_VAR: &str = "BONSAI_URL";
 
 /// A checked env file: below the project folder, not a link, and ignored by git
 /// when the folder is in a repository.
