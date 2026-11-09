@@ -13,7 +13,7 @@ env:
 
 jobs:
   fmt:
-    runs-on: ubuntu-24.04
+    runs-on: "runs-on=${{ github.run_id }}-fmt/cpu=2/family=c7i+m7i/image=ubuntu24-full-x64"
     steps:
       - uses: actions/checkout@v6
       - uses: dtolnay/rust-toolchain@stable
@@ -23,13 +23,15 @@ jobs:
       - run: cargo fmt --all --check
 
   clippy:
-    runs-on: ubuntu-24.04
+    runs-on: "runs-on=${{ github.run_id }}-clippy/cpu=4/family=c7i+m7i/image=ubuntu24-full-x64/extras=s3-cache"
     steps:
       - uses: actions/checkout@v6
       - uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: "1.90"
           components: clippy
+      - uses: runs-on/action@v2
+        if: runner.os == 'Linux'
       - uses: Swatinem/rust-cache@v2
       - run: cargo clippy --workspace --all-targets -- -D warnings
 
@@ -39,7 +41,11 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-24.04, macos-15]
-    runs-on: ${{ matrix.os }}
+    # Linux runs on RunsOn, macOS stays on GitHub (RunsOn has no macOS). The matrix
+    # values stay as they are so the check names do not change.
+    runs-on: >-
+      ${{ matrix.os == 'macos-15' && 'macos-15' ||
+      format('runs-on={0}-test-{1}/cpu=4/family=c7i+m7i/image=ubuntu24-full-x64/extras=s3-cache', github.run_id, strategy.job-index) }}
     env:
       BONSAI_KEYRING: "off"
       # Line numbers are all a failing test's backtrace needs; full debuginfo slows
@@ -50,6 +56,8 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: "1.90"
+      - uses: runs-on/action@v2
+        if: runner.os == 'Linux'
       - uses: Swatinem/rust-cache@v2
       - uses: taiki-e/install-action@v2
         with:
@@ -57,7 +65,7 @@ jobs:
       - run: cargo nextest run --workspace
 
   deny:
-    runs-on: ubuntu-24.04
+    runs-on: "runs-on=${{ github.run_id }}-deny/cpu=2/family=c7i+m7i/image=ubuntu24-full-x64"
     steps:
       - uses: actions/checkout@v6
       - uses: EmbarkStudios/cargo-deny-action@v2
@@ -74,13 +82,20 @@ jobs:
             target: x86_64-unknown-linux-musl
           - runner: ubuntu-24.04-arm
             target: aarch64-unknown-linux-musl
-    runs-on: ${{ matrix.runner }}
+    # Matrix values stay as they are so the check names do not change. The arm64
+    # entry runs on Graviton.
+    runs-on: >-
+      ${{ matrix.runner == 'ubuntu-24.04-arm' &&
+      format('runs-on={0}-musl-arm/cpu=4/family=c8g.*/image=ubuntu24-full-arm64/extras=s3-cache', github.run_id) ||
+      format('runs-on={0}-musl-x64/cpu=4/family=c7i+m7i/image=ubuntu24-full-x64/extras=s3-cache', github.run_id) }}
     steps:
       - uses: actions/checkout@v6
       - uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: "1.90"
           targets: ${{ matrix.target }}
+      - uses: runs-on/action@v2
+        if: runner.os == 'Linux'
       - uses: Swatinem/rust-cache@v2
         with:
           key: ${{ matrix.target }}
@@ -94,7 +109,7 @@ jobs:
   # Whether this push or PR touches what the nix build reads, for `nix`. A plain
   # diff, not paths-filter, which on a PR needs `pull-requests: read`.
   changes:
-    runs-on: ubuntu-24.04
+    runs-on: "runs-on=${{ github.run_id }}-changes/cpu=2/family=c7i+m7i/image=ubuntu24-full-x64"
     outputs:
       nix: ${{ steps.diff.outputs.nix }}
     steps:
@@ -122,7 +137,7 @@ jobs:
     if: >-
       needs.changes.outputs.nix == 'true' ||
       github.ref == 'refs/heads/main'
-    runs-on: ubuntu-24.04
+    runs-on: "runs-on=${{ github.run_id }}-nix/cpu=8/family=c7i+m7i/image=ubuntu24-full-x64"
     steps:
       - uses: actions/checkout@v6
       - uses: cachix/install-nix-action@v31
