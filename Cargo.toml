@@ -48,7 +48,7 @@ keyring-core = "1"
 apple-native-keyring-store = { version = "1", default-features = false, features = ["keychain"] }
 zbus-secret-service-keyring-store = { version = "1", features = ["crypto-rust"] }
 axum = "0.8"
-rusqlite = { version = "0.40", features = ["bundled"] }
+rusqlite = { version = "0.41", features = ["bundled"] }
 jsonschema = { version = "0.59", default-features = false, features = ["resolve-file", "idna"] }
 rand = "0.9"
 sha2 = "0.10"
