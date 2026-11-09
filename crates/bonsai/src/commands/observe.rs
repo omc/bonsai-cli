@@ -157,7 +157,7 @@ fn query_row(q: &TopQuery) -> Vec<String> {
 /// `(now - since, now)`, refusing more than `max_days` (the API's own bound) with
 /// exit 2. Both ends are sent: a server that defaulted `to` to its own, later `now`
 /// would find `--since 90d` over its 90-day bound.
-fn range(since: Duration, max_days: u64) -> Result<(Timestamp, Timestamp)> {
+pub(super) fn range(since: Duration, max_days: u64) -> Result<(Timestamp, Timestamp)> {
     if since > Duration::from_secs(max_days * DAY) {
         return Err(CoreError::Usage(format!("--since can be at most {max_days} days")).into());
     }
@@ -171,7 +171,7 @@ fn range(since: Duration, max_days: u64) -> Result<(Timestamp, Timestamp)> {
 
 /// The short messages `usage`, `metrics` and `queries` print for these errors, with the
 /// Problem kept as the cause: its exit code (1 or 3) and, under `--json`, its body.
-fn explain(e: ApiError, scope: &str) -> anyhow::Error {
+pub(super) fn explain(e: ApiError, scope: &str) -> anyhow::Error {
     let msg = match e.code() {
         Some(ProblemCode::MetricsUnavailable) => {
             let when = match &e {

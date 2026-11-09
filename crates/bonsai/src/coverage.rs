@@ -4,10 +4,11 @@
 
 /// `(operationId, commands)`. Each command is a space-separated subcommand path as typed
 /// after `bonsai`. An empty slice means reachable only through `bonsai api`, on purpose.
+/// `mcp` lists the operations its tools call.
 pub const COVERAGE: &[(&str, &[&str])] = &[
     // `login` shows the API Tokens page before asking for a token.
     ("getApiRoot", &["doctor", "version", "login"]),
-    ("getAccount", &["login", "whoami", "doctor"]),
+    ("getAccount", &["login", "whoami", "doctor", "mcp"]),
     // `login` reads a pasted token's expiry.
     ("getToken", &["login", "whoami"]),
     ("revokeToken", &["logout"]),
@@ -30,9 +31,10 @@ pub const COVERAGE: &[(&str, &[&str])] = &[
             "usage",
             "metrics",
             "queries",
+            "mcp",
         ],
     ),
-    ("createCluster", &["cluster create"]),
+    ("createCluster", &["cluster create", "mcp"]),
     (
         "getCluster",
         &[
@@ -49,12 +51,16 @@ pub const COVERAGE: &[(&str, &[&str])] = &[
             "usage",
             "metrics",
             "queries",
+            "mcp",
         ],
     ),
-    ("updateCluster", &["cluster rename"]),
-    ("deleteCluster", &["cluster destroy", "cluster create"]),
-    ("changeClusterPlan", &["cluster resize"]),
-    ("listClusterActions", &["cluster history", "history"]),
+    ("updateCluster", &["cluster rename", "mcp"]),
+    (
+        "deleteCluster",
+        &["cluster destroy", "cluster create", "mcp"],
+    ),
+    ("changeClusterPlan", &["cluster resize", "mcp"]),
+    ("listClusterActions", &["cluster history", "history", "mcp"]),
     (
         "getAction",
         &[
@@ -64,21 +70,22 @@ pub const COVERAGE: &[(&str, &[&str])] = &[
             "cluster create",
             "cluster resize",
             "cluster destroy",
+            "mcp",
         ],
     ),
-    ("getClusterUsage", &["usage"]),
-    ("getClusterMetrics", &["metrics"]),
-    ("getClusterTopQueries", &["queries"]),
-    ("listClusterCredentials", &["url"]),
+    ("getClusterUsage", &["usage", "mcp"]),
+    ("getClusterMetrics", &["metrics", "mcp"]),
+    ("getClusterTopQueries", &["queries", "mcp"]),
+    ("listClusterCredentials", &["url", "mcp"]),
     ("createClusterCredential", &[]),
-    ("getClusterCredential", &["url"]),
+    ("getClusterCredential", &["url", "mcp"]),
     ("revokeClusterCredential", &[]),
-    ("listPlans", &["plans", "cluster create"]),
+    ("listPlans", &["plans", "cluster create", "mcp"]),
     // `cluster create --plan` asks only among the plan's regions.
     ("getPlan", &["cluster resize", "cluster create"]),
-    ("listRegions", &["regions", "cluster create"]),
-    ("listSpaces", &["spaces", "cluster create"]),
-    ("listReleases", &["releases", "cluster create"]),
+    ("listRegions", &["regions", "cluster create", "mcp"]),
+    ("listSpaces", &["spaces", "cluster create", "mcp"]),
+    ("listReleases", &["releases", "cluster create", "mcp"]),
     ("startCliLogin", &["login"]),
     ("pollCliLogin", &["login"]),
 ];

@@ -248,7 +248,7 @@ pub(crate) fn create_private_dir(dir: &std::path::Path) -> Result<()> {
 /// Replaces `dir/name` with `text`: writes a 0600 temp file in `dir`, fsyncs it, and
 /// renames it over the old file, so a failed write never truncates it. The temp
 /// file is removed on error.
-pub(crate) fn replace_file(dir: &std::path::Path, name: &str, text: &str) -> std::io::Result<()> {
+pub fn replace_file(dir: &std::path::Path, name: &str, text: &str) -> std::io::Result<()> {
     use std::io::Write;
     use std::sync::atomic::{AtomicU32, Ordering};
     static SEQ: AtomicU32 = AtomicU32::new(0);

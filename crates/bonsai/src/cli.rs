@@ -102,6 +102,8 @@ pub enum Command {
     /// Teach Claude Code, or another agent, to use this CLI
     #[command(subcommand)]
     Skill(SkillCommand),
+    /// Serve the cluster tools to Claude Code or another MCP client, over stdio
+    Mcp(McpArgs),
 }
 
 #[derive(Debug, Args)]
@@ -433,6 +435,13 @@ pub struct SkillInstallArgs {
     /// Install into ./.claude/skills instead of ~/.claude/skills
     #[arg(long)]
     pub project: bool,
+}
+
+#[derive(Debug, Args)]
+pub struct McpArgs {
+    /// Leave out the tools that create, rename, resize or destroy clusters
+    #[arg(long)]
+    pub read_only: bool,
 }
 
 /// A duration such as `30m`, `7d`, `1h30m` or ISO 8601's `PT90S`. Days are 24 hours.

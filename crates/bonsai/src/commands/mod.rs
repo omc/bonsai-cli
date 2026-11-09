@@ -6,6 +6,7 @@ mod api;
 mod auth;
 mod catalogue;
 mod cluster;
+mod mcp;
 mod misc;
 mod observe;
 mod skill;
@@ -172,6 +173,7 @@ pub async fn run(command: Command, ctx: &Ctx) -> Result<()> {
         Command::Version => ctx.abortable(misc::version(ctx)).await,
         Command::Completion(args) => misc::completion(ctx, args),
         Command::Skill(command) => skill::run(ctx, command),
+        Command::Mcp(args) => mcp::run(ctx, args).await,
         Command::Api(args) => ctx.abortable(api::api(ctx, args)).await,
         Command::Clusters(args) => cluster::list(ctx, args).await,
         Command::Cluster(command) => cluster::run(ctx, command).await,

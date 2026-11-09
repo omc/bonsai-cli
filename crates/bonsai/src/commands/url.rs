@@ -37,7 +37,7 @@ fn line(env: Option<&str>, url: &SecretString) -> String {
 }
 
 /// A POSIX shell variable name: `[A-Za-z_][A-Za-z0-9_]*`.
-fn is_env_name(s: &str) -> bool {
+pub(super) fn is_env_name(s: &str) -> bool {
     let mut chars = s.chars();
     chars
         .next()

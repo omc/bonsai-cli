@@ -82,9 +82,10 @@ fn run() -> u8 {
         }
     };
     watch_ctrl_c(ctx.cancel.clone());
-    // Not for `completion`: a shell profile runs it on every new shell.
+    // Not for `completion`: a shell profile runs it on every new shell. Not for
+    // `mcp`: nobody reads its stderr, and it runs for hours.
     let update = (update::wanted(ctx.global.quiet)
-        && !matches!(cli.command, Command::Completion(_)))
+        && !matches!(cli.command, Command::Completion(_) | Command::Mcp(_)))
     .then(|| runtime.spawn(update::check(ctx.config_dir.clone())));
     let result = runtime.block_on(commands::run(cli.command, &ctx));
     let code = match result {
