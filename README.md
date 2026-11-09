@@ -71,8 +71,8 @@ bonsai cluster destroy search --confirm search
 Use the URL in your app:
 
 ```sh
-export ELASTICSEARCH_URL=$(bonsai url search)
-bonsai url search --env ELASTICSEARCH_URL >> .env
+export BONSAI_URL=$(bonsai url search)
+bonsai url search --env BONSAI_URL >> .env
 ```
 
 ## Commands
@@ -117,7 +117,7 @@ Commands never prompt when stdin isn't a terminal, when `CI` is set, or with `--
 
 ```sh
 id=$(bonsai cluster create "ci-$RUN_ID" --plan sandbox --region aws-us-east-1 --json | jq -r .result.cluster)
-export ELASTICSEARCH_URL=$(bonsai url "$id")
+export BONSAI_URL=$(bonsai url "$id")
 run-tests
 bonsai cluster destroy "$id" --confirm "ci-$RUN_ID"
 ```
