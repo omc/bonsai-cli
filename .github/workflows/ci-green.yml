@@ -1,0 +1,25 @@
+name: ci-green
+
+# release.yml runs this alongside its builds and publishes only if it passes, so a
+# commit that `ci` hasn't passed gets no tag and ships nothing. dist passes its plan;
+# unused.
+on:
+  workflow_call:
+    inputs:
+      plan:
+        required: true
+        type: string
+
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - run: |
+          runs="repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs"
+          passed=$(gh api "$runs?head_sha=$GITHUB_SHA&status=success&event=push" --jq .total_count)
+          if [ "$passed" -eq 0 ]; then
+            echo "::error::ci hasn't passed on $GITHUB_SHA. Wait for it, or fix it, then run the release again."
+            exit 1
+          fi

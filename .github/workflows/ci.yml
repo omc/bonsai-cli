@@ -4,13 +4,6 @@ on:
   push:
     branches: ["**"]
   pull_request:
-  # release.yml runs this alongside its builds and publishes only if it passes,
-  # so a commit that fails CI gets no tag and ships nothing. dist passes its plan; unused.
-  workflow_call:
-    inputs:
-      plan:
-        required: true
-        type: string
 
 permissions:
   contents: read
@@ -99,8 +92,7 @@ jobs:
           BONSAI_API_URL: http://127.0.0.1:9/v1
 
   # Whether this push or PR touches what the nix build reads, for `nix`. A plain
-  # diff, not paths-filter: on a PR that needs `pull-requests: read`, which
-  # release.yml doesn't grant when it calls this workflow.
+  # diff, not paths-filter, which on a PR needs `pull-requests: read`.
   changes:
     runs-on: ubuntu-24.04
     outputs:
@@ -113,7 +105,7 @@ jobs:
         env:
           BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
         run: |
-          # A new branch or a tag has no usable `before`; compare with main.
+          # A new branch has no usable `before`; compare with main.
           if ! git cat-file -e "$BASE^{commit}" 2>/dev/null; then
             BASE=$(git merge-base origin/main HEAD)
           fi
