@@ -11,3 +11,5 @@ publish = false
 name = "bonsai"
 release = true
 git_tag_name = "v{{ version }}"
+# The repo root's CHANGELOG.md, where dist also reads the release notes.
+changelog_path = "CHANGELOG.md"
