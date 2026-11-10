@@ -12,6 +12,7 @@ use bonsai_core::urlcheck::may_open;
 use bonsai_core::{
     ActionFailure, CleanupOutcome, CleanupPolicy, CoreError, CreateRequest, WaitOptions,
     create_cluster, destroy_cluster, on_cluster, resize_cluster, resolve_cluster, wait_for_action,
+    with_cluster,
 };
 use jiff::Timestamp;
 use serde_json::Value;
@@ -788,43 +789,32 @@ const MAX_PAGE: u32 = 100;
 
 async fn history(ctx: &Ctx, args: HistoryArgs) -> Result<()> {
     let a = ctx.authed().await?;
+    let (client, arg) = (&a.client, &args.cluster.cluster);
     let limit = args.limit;
     // `--limit` is the total; a page holds at most 100 (the contract's cap).
     let page_size = limit.map(|l| l.min(MAX_PAGE));
+    let list = |id: String| async move {
+        let pages = collect_pages(limit.map(|l| l as usize), |cursor| {
+            let id = &id;
+            async move {
+                client
+                    .list_cluster_actions(id, page_size, cursor.as_deref())
+                    .await
+            }
+        });
+        Ok::<_, CoreError>(pages.await?)
+    };
     if ctx.out.is_json() {
-        let client = &a.client;
         let (_, raw) = ctx
-            .abortable(async {
-                Ok(on_cluster(client, &args.cluster.cluster, |id| async move {
-                    let pages = collect_pages(limit.map(|l| l as usize), |cursor| {
-                        let id = &id;
-                        async move {
-                            client
-                                .list_cluster_actions(id, page_size, cursor.as_deref())
-                                .await
-                        }
-                    });
-                    Ok(pages.await?)
-                })
-                .await?)
-            })
+            .abortable(async { Ok(on_cluster(client, arg, list).await?) })
             .await?;
         return ctx.out.json(&Value::Array(raw));
     }
-    let cluster = resolve(ctx, &a.client, &args.cluster.cluster).await?.value;
-    let (actions, _) = ctx
-        .abortable(async {
-            let (client, id) = (&a.client, &cluster.id);
-            Ok(
-                collect_pages(limit.map(|l| l as usize), |cursor| async move {
-                    client
-                        .list_cluster_actions(id, page_size, cursor.as_deref())
-                        .await
-                })
-                .await?,
-            )
-        })
+    // The cluster only for its name: fetched alongside.
+    let (cluster, (actions, _)) = ctx
+        .abortable(async { Ok(with_cluster(client, arg, list).await?) })
         .await?;
+    let cluster = cluster.value;
     if actions.is_empty() {
         ctx.out.info(&format!("No actions on {}", cluster.name));
         return Ok(());

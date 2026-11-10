@@ -665,6 +665,42 @@ async fn a_name_resolves_without_fetching_the_cluster_twice() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn human_output_fetches_the_cluster_alongside() {
+    let env = Env::start().await;
+    let id = create(&env, "side", "sandbox");
+    let run = |arg: &str| {
+        let out = env
+            .authed()
+            .args(["-v", "cluster", "metrics", arg])
+            .output()
+            .unwrap();
+        assert!(out.status.success(), "{}", stderr(&out));
+        let text = String::from_utf8_lossy(&out.stdout).into_owned();
+        assert!(text.contains("side"), "{text}");
+        let mut seen = requests(&out);
+        seen.sort();
+        seen
+    };
+    // An ID: the cluster and its metrics, at the same time.
+    assert_eq!(
+        run(&id),
+        [
+            format!("GET /v1/clusters/{id}"),
+            format!("GET /v1/clusters/{id}/metrics"),
+        ]
+    );
+    // A name: both 404, the name is looked up, then the metrics again.
+    let mut want = vec![
+        "GET /v1/clusters".to_owned(),
+        "GET /v1/clusters/side".to_owned(),
+        "GET /v1/clusters/side/metrics".to_owned(),
+        format!("GET /v1/clusters/{id}/metrics"),
+    ];
+    want.sort();
+    assert_eq!(run("side"), want);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn json_and_url_call_the_endpoint_first() {
     let env = Env::start().await;
     let id = create(&env, "direct", "sandbox");

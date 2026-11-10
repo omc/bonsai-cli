@@ -15,7 +15,7 @@ use bonsai_api::{
 use bonsai_core::{
     ActionFailure, CleanupOutcome, CleanupPolicy, CoreError, CreateRequest, Event, EventSink,
     StopReason, WaitOptions, connection_url, create_cluster, destroy_cluster, device_login,
-    resize_cluster, resolve_cluster, wait_for_action,
+    resize_cluster, resolve_cluster, wait_for_action, with_cluster,
 };
 use bonsai_mock::{MockHandle, MockOptions};
 use secrecy::{ExposeSecret, SecretString};
@@ -1201,6 +1201,136 @@ async fn resolve_searches_names_across_pages() {
         Err(CoreError::Ambiguous { ids, .. }) => assert_eq!(ids, ["dup-1", "dup-2"]),
         other => panic!("expected Ambiguous, got {other:?}"),
     }
+}
+
+fn not_found() -> ResponseTemplate {
+    ResponseTemplate::new(404).set_body_raw(
+        json!({"type": "about:blank", "title": "Not Found", "status": 404,
+           "code": "not_found", "detail": "No such cluster.", "details": []})
+        .to_string(),
+        "application/problem+json",
+    )
+}
+
+fn usage_json() -> Value {
+    json!({"from": "2026-10-20T00:00:00Z", "to": "2026-10-21T00:00:00Z", "samples": []})
+}
+
+/// With an ID, the cluster and the call are fetched at the same time: two slow
+/// requests take about as long as one.
+#[tokio::test]
+async fn with_cluster_fetches_the_cluster_alongside_the_call() {
+    let server = MockServer::start().await;
+    let slow = Duration::from_millis(400);
+    Mock::given(method("GET"))
+        .and(path("/v1/clusters/c-1"))
+        .respond_with(
+            ResponseTemplate::new(200)
+                .set_body_json(cluster_json("c-1", "web"))
+                .set_delay(slow),
+        )
+        .mount(&server)
+        .await;
+    Mock::given(method("GET"))
+        .and(path("/v1/clusters/c-1/usage"))
+        .respond_with(
+            ResponseTemplate::new(200)
+                .set_body_json(usage_json())
+                .set_delay(slow),
+        )
+        .mount(&server)
+        .await;
+    let api = fake_api(&server);
+    let t0 = Instant::now();
+    let (cluster, usage) = with_cluster(&api, "c-1", |id| {
+        let api = &api;
+        async move { Ok(api.get_cluster_usage(&id, None, None).await?) }
+    })
+    .await
+    .unwrap();
+    let took = t0.elapsed();
+    assert_eq!(cluster.value.name, "web");
+    assert!(usage.value.samples.is_empty());
+    assert!(took < slow * 2 - Duration::from_millis(150), "{took:?}");
+}
+
+/// With a name, both 404, the name is looked up, and the call runs with the ID.
+#[tokio::test]
+async fn with_cluster_falls_back_to_the_name() {
+    let server = MockServer::start().await;
+    for p in ["/v1/clusters/web", "/v1/clusters/web/usage"] {
+        Mock::given(method("GET"))
+            .and(path(p))
+            .respond_with(not_found())
+            .mount(&server)
+            .await;
+    }
+    Mock::given(method("GET"))
+        .and(path("/v1/clusters"))
+        .and(query_param("name", "web"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+            "data": [cluster_json("c-1", "web")],
+            "next_cursor": null,
+        })))
+        .mount(&server)
+        .await;
+    Mock::given(method("GET"))
+        .and(path("/v1/clusters/c-1/usage"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(usage_json()))
+        .expect(1)
+        .mount(&server)
+        .await;
+    let api = fake_api(&server);
+    let (cluster, _) = with_cluster(&api, "web", |id| {
+        let api = &api;
+        async move { Ok(api.get_cluster_usage(&id, None, None).await?) }
+    })
+    .await
+    .unwrap();
+    assert_eq!(cluster.value.id, "c-1");
+    // The cluster isn't fetched a third time.
+    let gets = server.received_requests().await.unwrap();
+    assert!(
+        !gets.iter().any(|r| r.url.path() == "/v1/clusters/c-1"),
+        "{:?}",
+        gets.iter()
+            .map(|r| r.url.path().to_owned())
+            .collect::<Vec<_>>()
+    );
+}
+
+/// A cluster that exists with a call that fails is the call's error, not a name
+/// lookup.
+#[tokio::test]
+async fn with_cluster_keeps_the_calls_own_error() {
+    let server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path("/v1/clusters/c-1"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(cluster_json("c-1", "web")))
+        .mount(&server)
+        .await;
+    Mock::given(method("GET"))
+        .and(path("/v1/clusters/c-1/usage"))
+        .respond_with(not_found())
+        .mount(&server)
+        .await;
+    let api = fake_api(&server);
+    let err = with_cluster(&api, "c-1", |id| {
+        let api = &api;
+        async move { Ok(api.get_cluster_usage(&id, None, None).await?) }
+    })
+    .await
+    .err()
+    .unwrap();
+    assert!(
+        matches!(&err, CoreError::Api(e) if e.status() == Some(404)),
+        "{err:?}"
+    );
+    let gets = server.received_requests().await.unwrap();
+    assert!(
+        !gets.iter().any(|r| r.url.path() == "/v1/clusters"),
+        "no name lookup"
+    );
 }
 
 #[tokio::test]

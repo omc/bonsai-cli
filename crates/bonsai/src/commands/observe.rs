@@ -8,7 +8,7 @@ use std::time::Duration;
 
 use anyhow::Result;
 use bonsai_api::{ApiError, Cluster, Health, MetricBucket, ProblemCode, TopQuery};
-use bonsai_core::{CoreError, on_cluster, resolve_cluster};
+use bonsai_core::{CoreError, on_cluster, with_cluster};
 use jiff::{SignedDuration, Timestamp};
 use serde_json::Value;
 
@@ -50,12 +50,12 @@ pub async fn usage(ctx: &Ctx, args: UsageArgs) -> Result<()> {
             return ctx.out.json(&raw);
         }
         // Human output shows the cluster's current stats against its plan's limits,
-        // which only the cluster has.
-        let cluster = resolve_cluster(client, arg).await?;
-        let usage = client
-            .get_cluster_usage(&cluster.value.id, Some(from), Some(to))
-            .await
-            .map_err(|e| explain(e, "clusters:read"))?;
+        // which only the cluster has: fetched alongside.
+        let (cluster, usage) = with_cluster(client, arg, |id| async move {
+            Ok(client.get_cluster_usage(&id, Some(from), Some(to)).await?)
+        })
+        .await
+        .map_err(|e| explain_core(e, "clusters:read"))?;
         let c = &cluster.value;
         let stats = &c.stats;
         let range = span(args.since);
@@ -98,11 +98,14 @@ pub async fn metrics(ctx: &Ctx, args: MetricsArgs) -> Result<()> {
             .map_err(|e| explain_core(e, "clusters:read"))?;
             return ctx.out.json(&raw);
         }
-        let cluster = resolve_cluster(client, arg).await?;
-        let metrics = client
-            .get_cluster_metrics(&cluster.value.id, Some(from), Some(to), resolution)
-            .await
-            .map_err(|e| explain(e, "clusters:read"))?;
+        // The cluster only for its name and ID: fetched alongside.
+        let (cluster, metrics) = with_cluster(client, arg, |id| async move {
+            Ok(client
+                .get_cluster_metrics(&id, Some(from), Some(to), resolution)
+                .await?)
+        })
+        .await
+        .map_err(|e| explain_core(e, "clusters:read"))?;
         let m = &metrics.value;
         let mut rows = cluster_rows(&cluster.value);
         rows.push((
@@ -139,11 +142,11 @@ pub async fn queries(ctx: &Ctx, args: QueriesArgs) -> Result<()> {
             }
             return ctx.out.json(&raw);
         }
-        let cluster = resolve_cluster(client, arg).await?;
-        let top = client
-            .get_cluster_top_queries(&cluster.value.id, Some(window))
-            .await
-            .map_err(|e| explain(e, "query_logs:read"))?;
+        let (cluster, top) = with_cluster(client, arg, |id| async move {
+            Ok(client.get_cluster_top_queries(&id, Some(window)).await?)
+        })
+        .await
+        .map_err(|e| explain_core(e, "query_logs:read"))?;
         let t = &top.value;
         let limit = args.top.unwrap_or(DEFAULT_TOP);
         let shown = t.queries.len().min(limit);

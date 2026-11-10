@@ -44,6 +44,36 @@ where
     }
 }
 
+/// The cluster `arg` names, and `call` on it, for output that shows both.
+///
+/// With `arg` as the ID, `GET /clusters/{arg}` and `call` run at the same time, so
+/// the cluster costs no extra wait. When the cluster is a 404 (or `arg` can't be an
+/// ID), `arg` is looked up by name and `call` runs again with the ID; `call`'s first
+/// answer is dropped. A cluster that exists with a `call` that fails is `call`'s
+/// error. The same caveat as [`on_cluster`]: only for a `call` whose 404 means the
+/// cluster.
+pub async fn with_cluster<T, F, Fut>(
+    api: &Client,
+    arg: &str,
+    call: F,
+) -> Result<(Response<Cluster>, T), CoreError>
+where
+    F: Fn(String) -> Fut,
+    Fut: Future<Output = Result<T, CoreError>>,
+{
+    let (cluster, out) = tokio::join!(api.get_cluster(arg), call(arg.to_owned()));
+    match cluster {
+        Ok(cluster) => Ok((cluster, out?)),
+        Err(e) if not_an_id(&e) => {
+            tracing::debug!("{arg:?} isn't a cluster ID; looking it up by name");
+            let cluster = resolve_by_name(api, arg).await?;
+            let out = call(cluster.value.id.clone()).await?;
+            Ok((cluster, out))
+        }
+        Err(e) => Err(e.into()),
+    }
+}
+
 /// A 404, or an argument that can't be put in a path: not an ID, maybe a name.
 fn not_an_id(e: &ApiError) -> bool {
     e.status() == Some(404) || matches!(e, ApiError::InvalidPath(_))
