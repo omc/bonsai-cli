@@ -7,8 +7,9 @@ use crate::CoreError;
 /// The cluster `arg` names: its ID first, then an exact, case-insensitive name.
 ///
 /// `GET /clusters/{arg}`; on a 404 (or an `arg` that can't be an ID, such as `..`),
-/// `GET /clusters?name={arg}` across every page. One match is fetched by ID, so the
-/// response is the cluster's own; several are [`CoreError::Ambiguous`], none
+/// `GET /clusters?name={arg}` across every page. One match is the answer as the list
+/// gave it (a whole `Cluster`, so it isn't fetched again; its response headers are
+/// the list's, and nothing reads them); several are [`CoreError::Ambiguous`], none
 /// [`CoreError::ClusterNotFound`].
 pub async fn resolve_cluster(api: &Client, arg: &str) -> Result<Response<Cluster>, CoreError> {
     match api.get_cluster(arg).await {
@@ -23,23 +24,34 @@ pub async fn resolve_cluster(api: &Client, arg: &str) -> Result<Response<Cluster
         name: Some(arg.to_owned()),
         ..ClusterQuery::default()
     };
-    let (found, _) = collect_pages(None, |cursor| {
+    let (found, raw) = collect_pages(None, |cursor| {
         let query = &query;
         async move { api.list_clusters(query, cursor.as_deref()).await }
     })
     .await?;
     let wanted = arg.to_lowercase();
-    let mut ids: Vec<String> = found
+    let mut matches: Vec<_> = found
         .into_iter()
-        .filter(|c| c.name.to_lowercase() == wanted)
-        .map(|c| c.id)
+        .zip(raw)
+        .filter(|(c, _)| c.name.to_lowercase() == wanted)
         .collect();
-    match ids.len() {
+    match matches.len() {
         0 => Err(CoreError::ClusterNotFound(arg.to_owned())),
-        1 => Ok(api.get_cluster(&ids.remove(0)).await?),
+        1 => {
+            let (value, raw) = matches.remove(0);
+            Ok(Response {
+                value,
+                raw,
+                status: 200,
+                retry_after: None,
+                location: None,
+                idempotent_replayed: false,
+                date: None,
+            })
+        }
         _ => Err(CoreError::Ambiguous {
             name: arg.to_owned(),
-            ids,
+            ids: matches.into_iter().map(|(c, _)| c.id).collect(),
         }),
     }
 }

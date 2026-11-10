@@ -626,6 +626,44 @@ async fn bonsai_cluster_is_the_default_cluster() {
         .code(4);
 }
 
+/// The API requests a command made, as `-v` logs them: `GET /v1/clusters/x`.
+fn requests(out: &std::process::Output) -> Vec<String> {
+    stderr(out)
+        .lines()
+        .filter(|l| l.contains("bonsai_api::retry: request "))
+        .map(|l| {
+            let field = |k: &str| {
+                l.split(&format!("{k}="))
+                    .nth(1)
+                    .and_then(|r| r.split_whitespace().next())
+                    .unwrap_or("")
+                    .trim_matches('"')
+                    .to_owned()
+            };
+            format!("{} {}", field("method"), field("path"))
+        })
+        .collect()
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn a_name_resolves_without_fetching_the_cluster_twice() {
+    let env = Env::start().await;
+    let id = create(&env, "once", "sandbox");
+    let out = env
+        .authed()
+        .args(["-v", "cluster", "show", "once", "--json"])
+        .output()
+        .unwrap();
+    assert!(out.status.success(), "{}", stderr(&out));
+    assert_eq!(stdout_json(&out)["id"], id.as_str());
+    assert_eq!(
+        requests(&out),
+        ["GET /v1/clusters/once", "GET /v1/clusters"],
+        "{}",
+        stderr(&out)
+    );
+}
+
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn verbose_explains_the_404_before_a_name_lookup() {
     let env = Env::start().await;
