@@ -19,7 +19,7 @@ pub use flows::{
     CleanupPolicy, CreateRequest, LoginOutcome, connection_url, create_cluster, destroy_cluster,
     device_login, resize_cluster,
 };
-pub use resolve::resolve_cluster;
+pub use resolve::{on_cluster, resolve_cluster};
 pub use wait::{WaitOptions, wait_for_action};
 
 /// Errors from the flows: cluster lookup, waiting on Actions, creating, destroying,

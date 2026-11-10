@@ -11,7 +11,7 @@ use bonsai_core::config::Settings;
 use bonsai_core::urlcheck::may_open;
 use bonsai_core::{
     ActionFailure, CleanupOutcome, CleanupPolicy, CoreError, CreateRequest, WaitOptions,
-    create_cluster, destroy_cluster, resize_cluster, resolve_cluster, wait_for_action,
+    create_cluster, destroy_cluster, on_cluster, resize_cluster, resolve_cluster, wait_for_action,
 };
 use jiff::Timestamp;
 use serde_json::Value;
@@ -788,11 +788,31 @@ const MAX_PAGE: u32 = 100;
 
 async fn history(ctx: &Ctx, args: HistoryArgs) -> Result<()> {
     let a = ctx.authed().await?;
-    let cluster = resolve(ctx, &a.client, &args.cluster.cluster).await?.value;
     let limit = args.limit;
     // `--limit` is the total; a page holds at most 100 (the contract's cap).
     let page_size = limit.map(|l| l.min(MAX_PAGE));
-    let (actions, raw) = ctx
+    if ctx.out.is_json() {
+        let client = &a.client;
+        let (_, raw) = ctx
+            .abortable(async {
+                Ok(on_cluster(client, &args.cluster.cluster, |id| async move {
+                    let pages = collect_pages(limit.map(|l| l as usize), |cursor| {
+                        let id = &id;
+                        async move {
+                            client
+                                .list_cluster_actions(id, page_size, cursor.as_deref())
+                                .await
+                        }
+                    });
+                    Ok(pages.await?)
+                })
+                .await?)
+            })
+            .await?;
+        return ctx.out.json(&Value::Array(raw));
+    }
+    let cluster = resolve(ctx, &a.client, &args.cluster.cluster).await?.value;
+    let (actions, _) = ctx
         .abortable(async {
             let (client, id) = (&a.client, &cluster.id);
             Ok(
@@ -805,9 +825,6 @@ async fn history(ctx: &Ctx, args: HistoryArgs) -> Result<()> {
             )
         })
         .await?;
-    if ctx.out.is_json() {
-        return ctx.out.json(&Value::Array(raw));
-    }
     if actions.is_empty() {
         ctx.out.info(&format!("No actions on {}", cluster.name));
         return Ok(());

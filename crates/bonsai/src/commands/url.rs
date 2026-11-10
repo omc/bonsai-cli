@@ -2,7 +2,7 @@
 //! command that prints a secret; with `--write` it sets it in an env file instead.
 
 use anyhow::Result;
-use bonsai_core::{CoreError, connection_url};
+use bonsai_core::{CoreError, connection_url, on_cluster};
 use secrecy::{ExposeSecret, SecretString};
 
 use super::cluster::resolve;
@@ -29,11 +29,28 @@ pub async fn url(ctx: &Ctx, args: UrlArgs) -> Result<()> {
         None => None,
     };
     let a = ctx.authed().await?;
-    let cluster = resolve(ctx, &a.client, &args.cluster.cluster).await?.value;
-    let credential = args.credential.as_deref();
-    let url = ctx
-        .abortable(async { Ok(connection_url(&a.client, &cluster.id, credential).await?) })
-        .await?;
+    let client = &a.client;
+    let arg = &args.cluster.cluster;
+    let url = match args.credential.as_deref() {
+        // The cluster's own request first; its 404 can only mean no such cluster.
+        None => {
+            ctx.abortable(async {
+                Ok(on_cluster(client, arg, |id| async move {
+                    connection_url(client, &id, None).await
+                })
+                .await?)
+            })
+            .await?
+        }
+        // A 404 here could be the credential's, so the cluster is found first.
+        Some(credential) => {
+            let cluster = resolve(ctx, client, arg).await?.value;
+            ctx.abortable(async {
+                Ok(connection_url(client, &cluster.id, Some(credential)).await?)
+            })
+            .await?
+        }
+    };
     let Some((root, target)) = target else {
         // Written raw: the URL is the data, and sanitizing it would change it.
         return ctx.out.data_line(&line(args.env.as_deref(), &url));

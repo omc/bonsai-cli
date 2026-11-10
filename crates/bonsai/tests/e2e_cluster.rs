@@ -665,6 +665,56 @@ async fn a_name_resolves_without_fetching_the_cluster_twice() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn json_and_url_call_the_endpoint_first() {
+    let env = Env::start().await;
+    let id = create(&env, "direct", "sandbox");
+    let run = |args: &[&str]| {
+        let out = env.authed().arg("-v").args(args).output().unwrap();
+        assert!(out.status.success(), "{args:?}: {}", stderr(&out));
+        requests(&out)
+    };
+    for (sub, path) in [
+        ("usage", "usage"),
+        ("metrics", "metrics"),
+        ("queries", "queries"),
+        ("history", "actions"),
+    ] {
+        // An ID: the one request the command is about.
+        assert_eq!(
+            run(&["cluster", sub, &id, "--json"]),
+            [format!("GET /v1/clusters/{id}/{path}")],
+            "{sub}"
+        );
+        // A name: that request 404s, the name is looked up, then the request again.
+        assert_eq!(
+            run(&["cluster", sub, "direct", "--json"]),
+            [
+                format!("GET /v1/clusters/direct/{path}"),
+                "GET /v1/clusters".to_owned(),
+                format!("GET /v1/clusters/{id}/{path}"),
+            ],
+            "{sub}"
+        );
+    }
+    let url = run(&["cluster", "url", &id]);
+    assert_eq!(
+        url[0],
+        format!("GET /v1/clusters/{id}/credentials"),
+        "{url:?}"
+    );
+    assert_eq!(url.len(), 2, "{url:?}");
+
+    // A name nothing has is still "not found", after the same three steps' first two.
+    let out = env
+        .authed()
+        .args(["cluster", "metrics", "nothing-here", "--json"])
+        .output()
+        .unwrap();
+    assert_eq!(out.status.code(), Some(4), "{}", stderr(&out));
+    assert!(stderr(&out).contains("nothing-here"), "{}", stderr(&out));
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn verbose_explains_the_404_before_a_name_lookup() {
     let env = Env::start().await;
     let id = create(&env, "by-name", "sandbox");
