@@ -624,6 +624,19 @@ async fn bonsai_cluster_is_the_default_cluster() {
         .args(["cluster", "show", "nope"])
         .assert()
         .code(4);
+    // An empty variable is no cluster: a usage error, not a search for the name "".
+    for args in [
+        &["cluster", "show"][..],
+        &["cluster", "url"],
+        &["cluster", "show", ""],
+    ] {
+        env.authed()
+            .env("BONSAI_CLUSTER", "")
+            .args(args)
+            .assert()
+            .code(2)
+            .stderr(predicate::str::contains("CLUSTER"));
+    }
 }
 
 /// The API requests a command made, as `-v` logs them: `GET /v1/clusters/x`.

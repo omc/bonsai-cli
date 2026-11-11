@@ -117,7 +117,12 @@ pub struct LogoutArgs {
 #[derive(Debug, Args)]
 pub struct ClusterArg {
     /// The cluster's ID or name
-    #[arg(env = "BONSAI_CLUSTER", value_name = "CLUSTER")]
+    #[arg(
+        env = "BONSAI_CLUSTER",
+        value_name = "CLUSTER",
+        // An empty BONSAI_CLUSTER is no cluster, as an empty BONSAI_PROFILE is no profile.
+        value_parser = clap::builder::NonEmptyStringValueParser::new()
+    )]
     pub cluster: String,
 }
 
