@@ -1,19 +1,15 @@
 #!/usr/bin/env python3
-"""Off-camera steps for the demo recording, run inside the demo namespace.
+"""Off-camera step for the demo recording, run inside the demo namespace.
 
-  prepare.py dataset CLUSTER_NAME   Ages the cluster a week in bonsai-mock, so
-                                    `bonsai usage` has samples, and writes
-                                    products.ndjson with as many documents as the
-                                    mock's latest sample holds.
-  prepare.py stats CLUSTER_NAME     Sets the cluster's stats to that sample, so the
-                                    numbers in `usage` match what was loaded.
+  prepare.py CLUSTER_NAME   Ages the cluster a week in bonsai-mock, so
+                            `bonsai cluster usage` has samples, then sets the
+                            cluster's stats to the latest of them.
 
 Reads DEMO_DB, DEMO_TOKEN and DEMO_ADMIN from the environment.
 """
 
 import json
 import os
-import random
 import sqlite3
 import sys
 import urllib.request
@@ -59,27 +55,8 @@ def age(cluster_id, created_at):
         db.execute("UPDATE clusters SET created_at = ? WHERE id = ?", (text, cluster_id))
 
 
-COLOURS = ["black", "navy", "olive", "rust", "grey", "cream", "forest", "denim", "charcoal", "sand"]
-ITEMS = ["boots", "wool coat", "rain jacket", "beanie", "scarf", "sneakers", "parka", "gloves", "hoodie", "chinos"]
-
-
-def dataset(name):
-    cluster_id, created_at = cluster(name)
-    age(cluster_id, created_at)
-    n = latest_sample(cluster_id)["docs"]
-    rng = random.Random(42)
-    with open("products.ndjson", "w") as f:
-        for i in range(n):
-            colour, item = rng.choice(COLOURS), rng.choice(ITEMS)
-            doc = {"sku": f"SKU-{i:06d}", "name": f"{colour.title()} {item}", "price": round(rng.uniform(12, 240), 2)}
-            f.write('{"index":{}}\n' + json.dumps(doc) + "\n")
-
-
-def stats(name):
-    cluster_id, _ = cluster(name)
-    s = latest_sample(cluster_id)
-    api(f"/_mock/clusters/{cluster_id}/stats", ADMIN,
-        {"docs": s["docs"], "shards": s["shards"], "bytes": s["bytes"]}, method="POST")
-
-
-{"dataset": dataset, "stats": stats}[sys.argv[1]](sys.argv[2])
+cluster_id, created_at = cluster(sys.argv[1])
+age(cluster_id, created_at)
+s = latest_sample(cluster_id)
+api(f"/_mock/clusters/{cluster_id}/stats", ADMIN,
+    {"docs": s["docs"], "shards": s["shards"], "bytes": s["bytes"]}, method="POST")

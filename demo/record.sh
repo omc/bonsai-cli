@@ -24,7 +24,7 @@ trap cleanup EXIT
 cargo build -q -p bonsai -p bonsai-mock
 # Outside /home, which the namespace hides.
 mkdir -p "$WORK/real"
-cp target/debug/bonsai target/debug/bonsai-mock demo/fake_search.py demo/prepare.py "$WORK/real/"
+cp target/debug/bonsai target/debug/bonsai-mock demo/prepare.py "$WORK/real/"
 REAL=$WORK/real
 
 # --- a throwaway CA and a certificate for api.bonsai.io
@@ -35,15 +35,8 @@ openssl req -newkey rsa:2048 -nodes -subj "/CN=api.bonsai.io" \
 printf 'subjectAltName=DNS:api.bonsai.io\nextendedKeyUsage=serverAuth\n' >"$WORK/ext"
 openssl x509 -req -in "$WORK/api.csr" -CA "$WORK/ca.pem" -CAkey "$WORK/ca.key" \
   -CAcreateserial -days 1 -extfile "$WORK/ext" -out "$WORK/api.pem" 2>/dev/null
-# ... and one for the clusters' own hosts, served by demo/fake_search.py
-openssl req -newkey rsa:2048 -nodes -subj "/CN=*.us-east-1.bonsaisearch.net" \
-  -keyout "$WORK/search.key" -out "$WORK/search.csr" 2>/dev/null
-printf 'subjectAltName=DNS:*.us-east-1.bonsaisearch.net\nextendedKeyUsage=serverAuth\n' >"$WORK/ext2"
-openssl x509 -req -in "$WORK/search.csr" -CA "$WORK/ca.pem" -CAkey "$WORK/ca.key" \
-  -CAcreateserial -days 1 -extfile "$WORK/ext2" -out "$WORK/search.pem" 2>/dev/null
 
 # --- name resolution inside the namespace: api.bonsai.io is local, files only.
-# A cluster's host is added once it exists (point_dns, below), at 127.0.0.2.
 printf '127.0.0.1 localhost\n127.0.0.1 api.bonsai.io\n' >"$WORK/hosts"
 sed 's/^hosts:.*/hosts: files/' /etc/nsswitch.conf >"$WORK/nsswitch.conf"
 
@@ -56,11 +49,10 @@ unshare -rn --mount --pid --fork --kill-child sh -c "
   mount -t tmpfs tmpfs /home
   mkdir -p /home/demo
   '$REAL/bonsai-mock' --db '$WORK/mock.sqlite' serve --port 4010 --step-ms 400 --reset \
-    --public-url https://api.bonsai.io --checkout-url https://checkout.stripe.com/c/pay/ \
+    --public-url https://api.bonsai.io \
     >'$WORK/mock.out' 2>&1 &
   socat openssl-listen:443,bind=127.0.0.1,reuseaddr,fork,cert='$WORK/api.pem',key='$WORK/api.key',verify=0 \
     tcp:127.0.0.1:4010 &
-  python3 '$REAL/fake_search.py' '$WORK/search.pem' '$WORK/search.key' &
   wait
 " </dev/null >"$WORK/ns.log" 2>&1 &
 HOLDER=$!
@@ -76,25 +68,11 @@ exec nsenter -t $HOLDER --user --net --mount --preserve-credentials -- \\
 WRAP
   chmod +x "$WORK/bin/$1"
 }
-wrap bonsai-ns "$REAL/bonsai"
-wrap curl "$(command -v curl)"
+wrap bonsai "$REAL/bonsai"
 wrap nspython "$(command -v python3)"
-# The recording leaves out login's "No keychain here" warning (the demo stores
-# tokens in a file on purpose). CLICOLOR_FORCE keeps colour through the pipe.
-cat >"$WORK/bin/bonsai" <<'EOF'
-#!/usr/bin/env bash
-if [ "${1:-}" = login ]; then
-  CLICOLOR_FORCE=1 bonsai-ns "$@" 2> >(grep -v 'No keychain here' >&2)
-  rc=$?
-  wait
-  exit "$rc"
-fi
-exec bonsai-ns "$@"
-EOF
-chmod +x "$WORK/bin/bonsai"
 
-# --- globex has no card; its token can write clusters
-GLOBEX_TOKEN=$("$REAL/bonsai-mock" --db "$WORK/mock.sqlite" token create --account globex \
+# --- acme has every scope and a card on file
+TOKEN=$("$REAL/bonsai-mock" --db "$WORK/mock.sqlite" token create --account acme \
   --scopes "account:read clusters:read clusters:write credentials:read" --name demo)
 ADMIN=$(grep '^admin token' "$WORK/mock.out" | awk '{print $NF}')
 
@@ -102,26 +80,13 @@ cat >"$WORK/demo.env" <<EOF
 export PATH="$WORK/bin:\$PATH"
 export HOME=/home/demo
 unset XDG_CONFIG_HOME
-export TOKEN=$GLOBEX_TOKEN
 export BONSAI_CA_BUNDLE=$WORK/ca.pem
-export CURL_CA_BUNDLE=$WORK/ca.pem
 export BONSAI_KEYRING=off
-export DEMO_DB=$WORK/mock.sqlite DEMO_TOKEN=$GLOBEX_TOKEN DEMO_ADMIN=$ADMIN
-# off camera: add a card for globex, and have the next charge declined
-add_card_declined() {
-  curl -s -X PUT -H "Authorization: Bearer $ADMIN" \\
-    -H 'Content-Type: application/json' -d true https://api.bonsai.io/_mock/accounts/globex/payment_method
-  '$REAL/bonsai-mock' --db '$WORK/mock.sqlite' scenario set fail_next payment_failed >/dev/null
-}
-# off camera: resolve the cluster's host to the fake search server, and write
-# products.ndjson sized to match what the mock will report
-prepare_data() {
-  host=\$(bonsai url "\$1" | sed -E 's#^https://[^@]*@##')
-  echo "127.0.0.2 \$host" >>'$WORK/hosts'
-  nspython '$REAL/prepare.py' dataset "\$1"
-}
-# off camera: the cluster's stats catch up with the data just loaded
-sync_stats() { nspython '$REAL/prepare.py' stats "\$1"; }
+export DEMO_DB=$WORK/mock.sqlite DEMO_TOKEN=$TOKEN DEMO_ADMIN=$ADMIN
+# off camera: log in with acme's token, kept in a file as there is no keychain here
+demo_login() { echo $TOKEN | bonsai login --with-token --store-file >/dev/null 2>&1; }
+# off camera: give the cluster a week of history and some data to report
+add_history() { nspython '$REAL/prepare.py' "\$1"; }
 EOF
 
 if [ -n "${DRY_RUN:-}" ]; then
