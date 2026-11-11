@@ -10,6 +10,9 @@ ci = "github"
 # The run takes the tag as an input and creates it with the GitHub Release, so CI
 # tags without a personal token: a tag GITHUB_TOKEN pushes starts no workflow.
 dispatch-releases = true
+# No run on pull requests. dist's default plans the release on each one, on our own
+# runners, and a pull request from a fork brings its own copy of the workflow.
+pr-run-mode = "skip"
 # GitHub Release only. Homebrew and npm need "homebrew" and "npm" back in `installers`,
 # with `tap`, `npm-scope`, `publish-jobs` and the HOMEBREW_TAP_TOKEN and NPM_TOKEN secrets.
 installers = ["shell"]
