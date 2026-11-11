@@ -96,7 +96,7 @@ struct ClusterParam {
 
 #[derive(Debug, Deserialize, JsonSchema)]
 struct ListClustersParams {
-    /// Only clusters in this state, e.g. provisioned
+    /// Only clusters in this state, e.g. ready
     state: Option<String>,
     /// Only clusters in this region's ID
     region: Option<String>,
@@ -141,7 +141,7 @@ struct MetricsParams {
     cluster: String,
     /// How far back, such as 1h, 24h or 7d (default 1h, at most 30d)
     since: Option<String>,
-    /// The bucket size the API should use, such as 1m, 1h or 1d
+    /// The bucket size: 1m, 30m, 1h, 6h, 12h or 1d (default: the API picks one)
     resolution: Option<String>,
 }
 
@@ -149,7 +149,7 @@ struct MetricsParams {
 struct QueriesParams {
     /// The cluster's ID or name
     cluster: String,
-    /// The window, such as 24h or 7d (default: the API's)
+    /// The window: 1h, 1d, 7d, 14d or 30d (default 7d)
     window: Option<String>,
 }
 
