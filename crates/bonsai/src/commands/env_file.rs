@@ -105,7 +105,11 @@ fn check_ignored(root: &Path, path: &str) -> Result<()> {
         return Ok(());
     }
     // Exit 0: ignored. 1: not ignored, or tracked (check-ignore skips tracked files).
-    let out = git(&["check-ignore", "-q", "--", path]).context("couldn't run git")?;
+    // `./` in front: git reads a leading `:` as pathspec magic, so `:(top).env` would
+    // be answered for `.env` at the top of the repository, not for the file about to
+    // be written. check-ignore refuses GIT_LITERAL_PATHSPECS.
+    let literal = format!("./{path}");
+    let out = git(&["check-ignore", "-q", "--", &literal]).context("couldn't run git")?;
     match out.status.code() {
         Some(0) => Ok(()),
         Some(1) => bail!(
@@ -204,6 +208,46 @@ mod tests {
         }
         assert!(Target::check(dir.path(), "missing-dir/.env").is_err());
         assert!(Target::check(dir.path(), ".env").is_ok());
+    }
+
+    /// A repository in `dir` that ignores `.env`.
+    fn repo_ignoring_env(dir: &Path) {
+        let git = |args: &[&str]| {
+            let out = Command::new("git")
+                .arg("-C")
+                .arg(dir)
+                .args(args)
+                .output()
+                .unwrap();
+            assert!(out.status.success(), "git {args:?}");
+        };
+        git(&["init", "-q"]);
+        std::fs::write(dir.join(".gitignore"), ".env\n").unwrap();
+    }
+
+    #[test]
+    fn a_file_git_does_not_ignore_is_refused() {
+        let dir = tempfile::tempdir().unwrap();
+        repo_ignoring_env(dir.path());
+        assert!(Target::check(dir.path(), ".env").is_ok());
+        assert!(Target::check(dir.path(), "secrets.txt").is_err());
+    }
+
+    /// `:(top).env` is pathspec magic for the ignored `.env`, but the file written
+    /// would carry the literal name, which nothing ignores.
+    #[test]
+    fn pathspec_magic_does_not_pass_for_an_ignored_file() {
+        let dir = tempfile::tempdir().unwrap();
+        repo_ignoring_env(dir.path());
+        for bad in [
+            ":(top).env",
+            ":(glob)*.env",
+            ":(icase).ENV",
+            ":!.env",
+            ":^.env",
+        ] {
+            assert!(Target::check(dir.path(), bad).is_err(), "{bad:?}");
+        }
     }
 
     #[cfg(unix)]
