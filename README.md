@@ -2,25 +2,56 @@
   <a href="https://bonsai.io"><img src="docs/assets/bonsai-logo.png" alt="Bonsai" width="320"></a>
 </p>
 
-# bonsai
+<h1 align="center">Bonsai CLI</h1>
 
-`bonsai` is the command-line client for [Bonsai](https://bonsai.io), managed Elasticsearch and OpenSearch. Use it to create, resize and destroy clusters, get their connection URLs, and watch usage, metrics and top queries, from your terminal or from CI.
+<p align="center">
+  The command-line client for <a href="https://bonsai.io">Bonsai</a>, managed Elasticsearch and OpenSearch.
+</p>
 
-> **Status: pre-release.** There are no published binaries yet. Build it from source as shown below. Commands and output may still change before 1.0.
+<p align="center">
+  <a href="https://bonsai.io/docs/cli/overview/"><b>Documentation</b></a>
+  &nbsp;&nbsp;&nbsp;
+  <a href="https://bonsai.io/docs/cli/quickstart/"><b>Quickstart</b></a>
+  &nbsp;&nbsp;&nbsp;
+  <a href="https://bonsai.io/docs/agents/overview/"><b>AI agents</b></a>
+  &nbsp;&nbsp;&nbsp;
+  <a href="https://bonsai.io/docs/cli/reference/"><b>Command reference</b></a>
+  &nbsp;&nbsp;&nbsp;
+  <a href="CHANGELOG.md"><b>Changelog</b></a>
+</p>
+
+<p align="center">
+  <a href="https://github.com/omc/bonsai-cli/releases/latest/download/bonsai-aarch64-apple-darwin.tar.xz"><img src="https://img.shields.io/badge/macOS-Apple%20silicon-1f2328?style=for-the-badge&logo=apple&logoColor=white" alt="Download for macOS, Apple silicon"></a>
+  <a href="https://github.com/omc/bonsai-cli/releases/latest/download/bonsai-x86_64-apple-darwin.tar.xz"><img src="https://img.shields.io/badge/macOS-Intel-1f2328?style=for-the-badge&logo=apple&logoColor=white" alt="Download for macOS, Intel"></a>
+  <a href="https://github.com/omc/bonsai-cli/releases/latest/download/bonsai-x86_64-unknown-linux-musl.tar.xz"><img src="https://img.shields.io/badge/Linux-x86--64-1f2328?style=for-the-badge&logo=linux&logoColor=white" alt="Download for Linux, x86-64"></a>
+  <a href="https://github.com/omc/bonsai-cli/releases/latest/download/bonsai-aarch64-unknown-linux-musl.tar.xz"><img src="https://img.shields.io/badge/Linux-ARM64-1f2328?style=for-the-badge&logo=linux&logoColor=white" alt="Download for Linux, ARM64"></a>
+</p>
+
+`bonsai` creates, resizes and destroys clusters, gets their connection URLs, and shows their usage, metrics and top search queries, from your terminal, from CI, or through a coding agent. It talks to the [Bonsai API](https://bonsai.io/docs/api/overview/) with your account's token, so anything it does, the dashboard and the API can do too.
+
+```sh
+bonsai login
+bonsai cluster create search --plan standard-fir --region aws-us-east-1
+bonsai cluster url search --write .env
+```
+
+<p align="center">
+  <img src="docs/assets/demo.gif" alt="A terminal session: creating a cluster, writing its connection URL to .env, then checking its usage and listing clusters" width="800">
+</p>
 
 ## Install
 
-On macOS or Linux:
+On macOS or Linux, the install script downloads the binary for your machine:
 
 ```sh
 curl --proto '=https' --tlsv1.2 -LsSf https://github.com/omc/bonsai-cli/releases/latest/download/bonsai-installer.sh | sh
 ```
 
-Or with a package manager:
+To install by hand, download the archive for your machine with one of the buttons above, or from the [latest release](https://github.com/omc/bonsai-cli/releases/latest), and put `bonsai` on your `PATH`. Each release lists its checksums in `sha256.sum`. There are builds for macOS (Apple silicon and Intel) and Linux (x86-64 and ARM64). There is no Windows build.
+
+With Nix:
 
 ```sh
-brew install omc/tap/bonsai
-npm install -g @omc/bonsai
 nix profile install github:omc/bonsai-cli
 ```
 
@@ -31,6 +62,8 @@ git clone https://github.com/omc/bonsai-cli
 cd bonsai-cli
 cargo install --path crates/bonsai
 ```
+
+If you used the install script, `bonsai-update` moves you to the latest release. See [Install and log in](https://bonsai.io/docs/cli/install/).
 
 ## Log in
 
@@ -77,6 +110,8 @@ bonsai cluster url search --write .env
 
 `--write` sets `BONSAI_URL` in the file (`--env` names another variable), replacing the old line, without printing the URL. It writes only inside the current folder, refuses a file that git doesn't ignore or that is tracked, and leaves the file with mode 0600.
 
+The [quickstart](https://bonsai.io/docs/cli/quickstart/) walks through the same steps with their output.
+
 ## Commands
 
 | Area | Commands |
@@ -90,7 +125,7 @@ bonsai cluster url search --write .env
 | Anything else | `api`, `completion` |
 | Agents | `skill install`, `skill print`, `mcp` |
 
-`bonsai <command> --help` shows each command's flags.
+`bonsai <command> --help` shows each command's flags, and the [command reference](https://bonsai.io/docs/cli/reference/) lists them all.
 
 A cluster can be named by its ID or by its name. Set `BONSAI_CLUSTER` to give commands a default cluster.
 
@@ -105,15 +140,9 @@ bonsai api POST /clusters/<cluster-id>/credentials -d '{"name": "reader", "acces
 
 It prints the API's response as it is, so it can print passwords. Paths take cluster IDs, not names.
 
-## Output
+## Scripting and CI
 
-- **Tables** fit your terminal. They show the key columns, cut long text with `…`, and leave out the least important columns when space runs out. Add `-w`/`--wide` to see every column. Piped output is never cut.
-- **`--json`** prints the API's JSON, for scripts and `jq`. Control and bidirectional-text characters inside strings are escaped as `\uXXXX`, so they can't disturb your terminal.
-- **Messages and progress** go to stderr and data goes to stdout, so `$(bonsai cluster url search)` captures only the URL.
-- **Text from the API**, such as cluster names and search terms, is cleaned of terminal control characters before it's shown.
-- **Secrets.** Only `bonsai cluster url` prints a cluster's password (`--write` puts it in a file instead), plus `bonsai api` when the API response includes one.
-
-## Scripting
+Every command takes `--json`, which prints the API's JSON for scripts and `jq`. Messages and progress go to stderr and data goes to stdout, so `$(bonsai cluster url search)` captures only the URL.
 
 Commands never prompt when stdin isn't a terminal, when `CI` is set, or with `--no-input`. Instead they fail with exit code 2 and name the missing flag.
 
@@ -124,74 +153,45 @@ run-tests
 bonsai cluster destroy "$id" --confirm "ci-$RUN_ID"
 ```
 
-If a create fails after Bonsai started it, Bonsai removes the failed cluster, and the CLI tells you so.
+Exit codes say what went wrong: 3 for a missing token or scope, 4 for not found, 5 for a failed Action, 9 for a timeout. [Scripting and CI](https://bonsai.io/docs/cli/scripting/) has the full list.
 
-### Agents
+## AI agents
 
-`bonsai skill install` writes a [Claude Code skill](https://docs.claude.com/en/docs/claude-code/skills) to `~/.claude/skills/bonsai/SKILL.md`. It tells the agent to use `--json --no-input`, which commands to run, what the exit codes mean, and to confirm before changes that cost money. Add `--project` to write it to `.claude/skills/` in the current directory instead. Run it again after an upgrade to bring the skill up to date.
+A coding agent can manage clusters with the same binary, in two ways. You can use both.
 
-For other agents, `bonsai skill print` prints the same text, e.g. to add to `AGENTS.md`.
+`bonsai skill install` writes a [Claude Code skill](https://docs.claude.com/en/docs/claude-code/skills) to `~/.claude/skills/bonsai/SKILL.md`. It tells the agent to use `--json --no-input`, which commands to run, what the exit codes mean, and to confirm before changes that cost money. For other agents, `bonsai skill print` prints the same text, e.g. to add to `AGENTS.md`.
 
-### MCP
-
-`bonsai mcp` is an [MCP](https://modelcontextprotocol.io) server on stdin and stdout, for clients that call tools instead of running a shell. It uses the same token as every other command, so `bonsai login` is all the setup it needs, and the token never goes in the client's config. To add it to Claude Code, run this in your project folder:
+`bonsai mcp` is an [MCP](https://modelcontextprotocol.io) server on stdin and stdout, for clients that call tools instead of running a shell. To add it to Claude Code, run this in your project folder:
 
 ```sh
 claude mcp add bonsai -- bonsai mcp
 ```
 
-Add `--scope user` to have it in every project. Other clients (Claude Desktop, Cursor, VS Code) take the usual `mcpServers` entry: `{"bonsai": {"command": "bonsai", "args": ["mcp"]}}`. Where there's no keychain, as in a container, set `BONSAI_TOKEN` in the entry's `env`.
+Other clients (Claude Desktop, Cursor, VS Code) take the usual `mcpServers` entry: `{"bonsai": {"command": "bonsai", "args": ["mcp"]}}`.
 
-Its tools are named after the API's operations: `list_clusters`, `get_cluster`, `list_cluster_actions`, `get_cluster_usage`, `get_cluster_metrics`, `get_cluster_top_queries`, `list_plans`, `list_regions`, `list_spaces`, `list_releases`, `whoami`, `get_action`, `wait_action`, and to change things `create_cluster`, `rename_cluster`, `resize_cluster` and `destroy_cluster`. Each returns the API's JSON, as `--json` prints it.
+The agent never sees your API token or a cluster's password. The server uses the token `bonsai login` stored, so nothing goes in the client's config, and `write_cluster_url` writes the connection URL to a git-ignored env file and answers with the password as `****`. `destroy_cluster` needs the cluster's current name as confirmation, and `bonsai mcp --read-only` leaves out the tools that change clusters.
 
-- **Changes.** `create_cluster`, `resize_cluster` and `destroy_cluster` return the Action at once; the agent follows it with `wait_action`, which waits up to five minutes per call. `destroy_cluster` needs `confirm` set to the cluster's current name. `bonsai mcp --read-only` leaves out the tools that change clusters.
-- **Passwords.** No tool returns one. `write_cluster_url` writes the connection URL to an env file in the project (`.env` and `BONSAI_URL` by default) and answers with the password as `****`. It writes only below the folder the server started in, and refuses a file that git doesn't ignore or that is tracked, so the password can't be committed. The file is left with mode 0600.
-- **Search terms.** `get_cluster_top_queries` returns what your cluster's users typed. It is data, and the tool says so to the agent, but treat it as untrusted text.
+See [Using Bonsai with AI agents](https://bonsai.io/docs/agents/overview/) for setup by client, example prompts and the safety model.
 
-### Exit codes
-
-| Code | Meaning |
-|---|---|
-| 0 | Success |
-| 1 | Network errors, server errors, anything not listed below |
-| 2 | Usage: a bad or missing flag, or an ambiguous cluster name |
-| 3 | Not allowed: no token, an invalid token, or a missing scope |
-| 4 | Not found |
-| 5 | The Action failed |
-| 6 | A payment method is needed, or the card was refused |
-| 7 | Busy: another change is already running |
-| 8 | Refused: the request was valid but Bonsai declined it |
-| 9 | `--timeout` ran out before the Action finished |
-| 130 | Interrupted with Ctrl-C |
-
-## Configuration
+## Documentation
 
 | | |
 |---|---|
-| `--profile`, `BONSAI_PROFILE` | Use a named profile, e.g. one per account |
-| `--api-url`, `BONSAI_API_URL` | Talk to another API URL |
-| `BONSAI_TOKEN` | Use this token instead of the stored one |
-| `BONSAI_CLUSTER` | The default cluster |
-| `BONSAI_CA_BUNDLE` | Extra CA certificates (PEM), e.g. behind a TLS-inspecting proxy |
-| `BONSAI_KEYRING=off` | Don't use the system keychain |
-| `COLUMNS` | The table width |
-| `NO_COLOR` | Turn colour off |
-| `BONSAI_NO_UPDATE_NOTIFIER` | Don't check for new releases |
-| `-v`, `-vv` | Log requests to stderr. Tokens are never logged |
+| [Overview](https://bonsai.io/docs/cli/overview/) | What the CLI does, and when to use the API or Terraform instead |
+| [Install and log in](https://bonsai.io/docs/cli/install/) | Installing, logging in, where the token is kept, updating |
+| [Quickstart](https://bonsai.io/docs/cli/quickstart/) | Create a cluster, connect to it, watch it and destroy it |
+| [Managing clusters](https://bonsai.io/docs/cli/clusters/) | Create, show, rename, resize and destroy, and how Actions run |
+| [Connection URLs](https://bonsai.io/docs/cli/connection-urls/) | Get a cluster's URL without leaking its password |
+| [Usage, metrics and queries](https://bonsai.io/docs/cli/monitoring/) | What a cluster holds and how it's used |
+| [Scripting and CI](https://bonsai.io/docs/cli/scripting/) | JSON output, exit codes, running without prompts, `bonsai api` |
+| [Agent skill](https://bonsai.io/docs/cli/agent-skill/) | Teach Claude Code, or another agent, to use the CLI |
+| [MCP server](https://bonsai.io/docs/cli/mcp-server/) | The tools `bonsai mcp` serves, and how to connect a client |
+| [Configuration](https://bonsai.io/docs/cli/configuration/) | Profiles, environment variables, files, shell completion, update checks |
+| [Command reference](https://bonsai.io/docs/cli/reference/) | Every command and flag |
 
-Settings live in `~/.config/bonsai/` (`$XDG_CONFIG_HOME/bonsai/` if set):
+## Support
 
-- `config.toml` holds your profiles.
-- `credentials.toml` holds stored tokens when you use `--store-file`.
-- `update-check.json` records when the CLI last checked for a new release.
-
-A stored token is used only with the API URL it was logged in to. Point a profile at another URL and the CLI refuses to send it there; log in again or set `BONSAI_TOKEN`.
-
-Shell completion: `bonsai completion bash|zsh|fish|powershell`.
-
-### Updates
-
-Once a day, a command run in a terminal asks GitHub (`api.github.com`) for the latest release. If it's newer, the command ends with a line saying how to update: `brew upgrade bonsai`, `npm install -g @omc/bonsai`, or `bonsai-update` if you used the install script. The request carries only the CLI's version, OS and architecture, in its User-Agent. The check is skipped in CI, under `--quiet`, when stderr isn't a terminal, for Nix installs, and when `BONSAI_NO_UPDATE_NOTIFIER` is set.
+If you have a question, a problem, or something you'd like the CLI to do, write to [support@bonsai.io](mailto:support@bonsai.io).
 
 ## Contributing
 
