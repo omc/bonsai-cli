@@ -89,7 +89,8 @@ impl Printer {
         finish(writeln!(self.stdout(), "{s}"))
     }
 
-    /// Aligned `key  value` rows to stdout; values are sanitized.
+    /// Aligned `key  value` rows to stdout; values are sanitized as a table's cells
+    /// are, so a value with a newline can't start a row of its own.
     pub fn kv(&self, rows: &[(&str, String)]) -> Result<()> {
         let width = rows
             .iter()
@@ -99,7 +100,7 @@ impl Printer {
         let mut out = self.stdout().lock();
         for (k, v) in rows {
             let pad = " ".repeat(width - k.chars().count());
-            finish(writeln!(out, "{}{pad}  {}", k.bold(), sanitize(v, false)))?;
+            finish(writeln!(out, "{}{pad}  {}", k.bold(), cell(v)))?;
         }
         Ok(())
     }
