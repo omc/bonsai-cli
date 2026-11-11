@@ -1,0 +1,9 @@
+# gitleaks' default rules, minus the key of the tests' own HTTPS server: its
+# certificate is for 127.0.0.1, signed by the throwaway CA beside it, and only
+# crates/bonsai-api/tests/client.rs trusts that CA.
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "The test server's private key"
+paths = ['''^crates/bonsai-api/tests/fixtures/test-server\.key$''']
