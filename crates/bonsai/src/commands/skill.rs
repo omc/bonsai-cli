@@ -19,12 +19,15 @@ pub fn run(ctx: &Ctx, command: SkillCommand) -> Result<()> {
 }
 
 fn install(ctx: &Ctx, args: SkillInstallArgs) -> Result<()> {
-    let root = if args.project {
-        PathBuf::from(".claude")
+    let below = Path::new("skills").join("bonsai").join("SKILL.md");
+    let path = if args.project {
+        // A cloned repository can ship `.claude` as a link to anywhere.
+        let path = Path::new(".claude").join(below);
+        refuse_links(Path::new("."), &path)?;
+        path
     } else {
-        claude_dir()?
+        claude_dir()?.join(below)
     };
-    let path = root.join("skills").join("bonsai").join("SKILL.md");
     let status = write(&path)?;
     if ctx.out.is_json() {
         return ctx
@@ -77,6 +80,25 @@ fn claude_dir() -> Result<PathBuf> {
         .context("couldn't find the home directory; use --project")
 }
 
+/// Fails when `rel` or a folder on the way to it, below `base`, is a symbolic link:
+/// writing through it would land outside the project.
+fn refuse_links(base: &Path, rel: &Path) -> Result<()> {
+    let mut at = base.to_path_buf();
+    for part in rel.components() {
+        at.push(part);
+        match std::fs::symlink_metadata(&at) {
+            Ok(m) if m.file_type().is_symlink() => anyhow::bail!(
+                "{} is a symbolic link; --project writes only inside this folder",
+                at.strip_prefix(base).unwrap_or(&at).display()
+            ),
+            Ok(_) => {}
+            Err(e) if e.kind() == ErrorKind::NotFound => break,
+            Err(e) => return Err(e).with_context(|| format!("couldn't read {}", at.display())),
+        }
+    }
+    Ok(())
+}
+
 /// Writes the skill to `path`, creating its directories. A file this version wrote
 /// is left alone; any other is replaced, so an upgrade brings the skill up to date.
 fn write(path: &Path) -> Result<Status> {
@@ -111,6 +133,30 @@ mod tests {
         std::fs::write(&path, "an older skill").unwrap();
         assert_eq!(write(&path).unwrap(), Status::Updated);
         assert_eq!(std::fs::read_to_string(&path).unwrap(), SKILL);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_link_on_the_way_to_the_project_skill_is_refused() {
+        use std::os::unix::fs::symlink;
+        let rel = Path::new(".claude/skills/bonsai/SKILL.md");
+        let outside = tempfile::tempdir().unwrap();
+        let plain = tempfile::tempdir().unwrap();
+        assert!(refuse_links(plain.path(), rel).is_ok());
+        std::fs::create_dir_all(plain.path().join(".claude/skills/bonsai")).unwrap();
+        assert!(refuse_links(plain.path(), rel).is_ok());
+
+        let folder = tempfile::tempdir().unwrap();
+        symlink(outside.path(), folder.path().join(".claude")).unwrap();
+        assert!(refuse_links(folder.path(), rel).is_err());
+
+        let file = tempfile::tempdir().unwrap();
+        std::fs::create_dir_all(file.path().join(".claude/skills/bonsai")).unwrap();
+        let target = outside.path().join("target");
+        std::fs::write(&target, "theirs").unwrap();
+        symlink(&target, file.path().join(rel)).unwrap();
+        assert!(refuse_links(file.path(), rel).is_err());
+        assert_eq!(std::fs::read_to_string(&target).unwrap(), "theirs");
     }
 
     #[test]
