@@ -15,6 +15,8 @@ use crate::wait::deadline_after;
 const SLOW_DOWN: Duration = Duration::from_secs(5);
 /// The least time between polls, whatever `interval` says.
 const MIN_INTERVAL: Duration = Duration::from_secs(1);
+/// The longest a login is polled for, whatever `expires_in` says.
+const MAX_WAIT: Duration = Duration::from_secs(60 * 60);
 
 pub struct LoginOutcome {
     pub token: SecretString,
@@ -37,7 +39,7 @@ pub async fn device_login(
 ) -> Result<LoginOutcome, CoreError> {
     let grant = api.start_cli_login(&start).await?.value;
     on_grant(&grant);
-    let deadline = deadline_after(Duration::from_secs(grant.expires_in));
+    let deadline = deadline_after(Duration::from_secs(grant.expires_in).min(MAX_WAIT));
     let mut interval = Duration::from_secs(grant.interval).max(MIN_INTERVAL);
     loop {
         tokio::select! {
