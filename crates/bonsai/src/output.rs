@@ -288,21 +288,37 @@ impl Column {
     }
 }
 
-/// The width tables fit: `COLUMNS` when it's a positive integer, else the
-/// terminal's when stdout is one, else unlimited (`None`), so piped output is
-/// whole.
+/// Sets the table width whatever stdout is. For the tests, which read tables
+/// through a pipe.
+const TEST_WIDTH: &str = "BONSAI_TEST_COLUMNS";
+
+/// The width tables fit. On a terminal, `COLUMNS` when it's a positive integer,
+/// else the terminal's. Anywhere else unlimited (`None`), so piped output is whole
+/// even in a shell that exports `COLUMNS`.
 pub fn table_width() -> Option<usize> {
-    if let Some(n) = std::env::var("COLUMNS")
-        .ok()
-        .and_then(|v| v.trim().parse::<usize>().ok())
-        .filter(|&n| n > 0)
-    {
+    let var = |name: &str| std::env::var(name).ok();
+    width_from(
+        var(TEST_WIDTH).as_deref(),
+        std::io::stdout().is_terminal(),
+        var("COLUMNS").as_deref(),
+        || terminal_size::terminal_size().map(|(w, _)| usize::from(w.0)),
+    )
+}
+
+fn width_from(
+    test: Option<&str>,
+    terminal: bool,
+    columns: Option<&str>,
+    measured: impl FnOnce() -> Option<usize>,
+) -> Option<usize> {
+    let positive = |v: Option<&str>| v?.trim().parse::<usize>().ok().filter(|&n| n > 0);
+    if let Some(n) = positive(test) {
         return Some(n);
     }
-    if !std::io::stdout().is_terminal() {
+    if !terminal {
         return None;
     }
-    terminal_size::terminal_size().map(|(w, _)| usize::from(w.0))
+    positive(columns).or_else(measured)
 }
 
 /// API text as one table cell: [`sanitize`]d (tabs kept), then tabs and newlines
@@ -616,6 +632,18 @@ pub fn relative_time(t: Timestamp, now: Timestamp) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn columns_sets_the_width_only_on_a_terminal() {
+        let term = || Some(120);
+        assert_eq!(width_from(None, true, None, term), Some(120));
+        assert_eq!(width_from(None, true, Some("60"), term), Some(60));
+        assert_eq!(width_from(None, true, Some("0"), term), Some(120));
+        assert_eq!(width_from(None, true, Some("wide"), term), Some(120));
+        // Piped: whole, whatever the shell exported.
+        assert_eq!(width_from(None, false, Some("60"), term), None);
+        assert_eq!(width_from(Some("40"), false, Some("60"), term), Some(40));
+    }
     use unicode_segmentation::UnicodeSegmentation;
 
     #[test]

@@ -1133,7 +1133,7 @@ async fn history_times_are_compact_unless_wide() {
     // At 60 columns STARTED still fits.
     let narrow = env
         .authed()
-        .env("COLUMNS", "60")
+        .env("BONSAI_TEST_COLUMNS", "60")
         .args(["cluster", "history", &id])
         .output()
         .unwrap();
@@ -1156,7 +1156,7 @@ async fn history_times_are_compact_unless_wide() {
         let header = |extra: &[&str]| {
             let out = env
                 .authed()
-                .env("COLUMNS", cols)
+                .env("BONSAI_TEST_COLUMNS", cols)
                 .args(["cluster", "history", &id])
                 .args(extra)
                 .output()
@@ -1360,7 +1360,7 @@ async fn clusters_fit_columns_and_keep_ids_whole() {
         .collect();
     let out = env
         .authed()
-        .env("COLUMNS", "60")
+        .env("BONSAI_TEST_COLUMNS", "60")
         .args(["cluster", "list"])
         .output()
         .unwrap();
@@ -1391,7 +1391,7 @@ async fn clusters_fit_columns_and_keep_ids_whole() {
     // Only the keys left: printed whole, wider than the width.
     let out = env
         .authed()
-        .env("COLUMNS", "20")
+        .env("BONSAI_TEST_COLUMNS", "20")
         .args(["cluster", "list"])
         .output()
         .unwrap();
@@ -1400,6 +1400,17 @@ async fn clusters_fit_columns_and_keep_ids_whole() {
     for line in narrow.lines() {
         assert_eq!(line.split_whitespace().count(), 2, "{narrow}");
     }
+
+    // A shell that exports COLUMNS doesn't cut what a pipe reads.
+    let whole = env.authed().args(["cluster", "list"]).output().unwrap();
+    let piped = env
+        .authed()
+        .env("COLUMNS", "20")
+        .args(["cluster", "list"])
+        .output()
+        .unwrap();
+    assert_eq!(text(&piped.stdout), text(&whole.stdout));
+    assert_ne!(text(&piped.stdout), narrow);
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]

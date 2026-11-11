@@ -89,6 +89,7 @@ pub fn std_bonsai(mock: &MockHandle, cfg: &Path) -> std::process::Command {
         "CLICOLOR_FORCE",
         "RUST_LOG",
         "COLUMNS",
+        "BONSAI_TEST_COLUMNS",
     ] {
         c.env_remove(var);
     }

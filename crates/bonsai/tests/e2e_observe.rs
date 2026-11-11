@@ -86,7 +86,7 @@ async fn plans_human_output_at_60_columns() {
     let env = Env::start().await;
     let out = env
         .authed()
-        .env("COLUMNS", "60")
+        .env("BONSAI_TEST_COLUMNS", "60")
         .arg("plans")
         .output()
         .unwrap();
@@ -368,7 +368,7 @@ async fn action_show_prints_the_action() {
     assert!(text.contains("Created     20"), "{text}");
     let out = env
         .authed()
-        .env("COLUMNS", "60")
+        .env("BONSAI_TEST_COLUMNS", "60")
         .args(["action", "show", &action])
         .output()
         .unwrap();
@@ -588,7 +588,7 @@ async fn queries_sanitized() {
     // Fitted to a narrow width, still sanitized.
     let out = env
         .authed()
-        .env("COLUMNS", "30")
+        .env("BONSAI_TEST_COLUMNS", "30")
         .args(["cluster", "queries", &cluster, "--top", "100"])
         .output()
         .unwrap();
