@@ -71,6 +71,14 @@ impl Target {
             Err(e) if e.kind() == ErrorKind::NotFound => String::new(),
             Err(e) => return Err(e).context(self.rel.display().to_string()),
         };
+        // A line break in the value would add lines of the API's choosing to the file.
+        if url
+            .expose_secret()
+            .chars()
+            .any(|c| c.is_control() || c.is_whitespace())
+        {
+            bail!("the API's URL has a space or a control character in it; nothing was written");
+        }
         let (text, replaced) = upsert(&old, var, url.expose_secret());
         let dir = full.parent().unwrap_or(root);
         let name = full
@@ -189,6 +197,30 @@ mod tests {
         let (text, replaced) = upsert("AB=1\n# A=2\n", "A", "3");
         assert!(!replaced);
         assert_eq!(text, "AB=1\n# A=2\nA=3\n");
+    }
+
+    #[test]
+    fn a_url_with_a_line_break_is_not_written() {
+        let dir = tempfile::tempdir().unwrap();
+        let target = Target::check(dir.path(), ".env").unwrap();
+        for bad in [
+            "https://u:p@h\nPATH=/tmp",
+            "https://u:p@h\r",
+            "https://u:p@h x",
+        ] {
+            let url = SecretString::from(bad.to_owned());
+            assert!(
+                target.write(dir.path(), "BONSAI_URL", &url).is_err(),
+                "{bad:?}"
+            );
+        }
+        assert!(!dir.path().join(".env").exists());
+        let url = SecretString::from("https://u:p@h".to_owned());
+        target.write(dir.path(), "BONSAI_URL", &url).unwrap();
+        assert_eq!(
+            std::fs::read_to_string(dir.path().join(".env")).unwrap(),
+            "BONSAI_URL=https://u:p@h\n"
+        );
     }
 
     #[test]
