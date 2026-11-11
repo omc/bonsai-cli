@@ -35,17 +35,17 @@ pub enum CoreError {
     /// Boxed, so `CoreError` stays small enough for `Result` (`clippy::result_large_err`).
     #[error("action {} failed: {}", .0.action_id, .0.message)]
     ActionFailed(Box<ActionFailure>),
-    #[error("still running after {}; resume with `bonsai wait {action_id}`", human_duration(*.timeout))]
+    #[error("still running after {}; resume with `bonsai wait {}`", human_duration(*.timeout), shell_quote(.action_id))]
     Timeout {
         action_id: String,
         timeout: Duration,
     },
-    #[error("stopped waiting; resume with `bonsai wait {action_id}`")]
+    #[error("stopped waiting; resume with `bonsai wait {}`", shell_quote(.action_id))]
     Cancelled { action_id: String },
     /// Polling the Action failed after the client's retries; the Action may still run.
     /// The message leaves `source` out: it is the error's `source()`, so a chain
     /// printer (`{:#}`) shows it once.
-    #[error("couldn't check on action {action_id}; resume with `bonsai wait {action_id}`")]
+    #[error("couldn't check on action {action_id}; resume with `bonsai wait {}`", shell_quote(.action_id))]
     WaitFailed {
         action_id: String,
         #[source]
@@ -61,6 +61,18 @@ pub enum CoreError {
     LoginExpired,
     #[error("stopped waiting for the login to be approved")]
     LoginCancelled,
+}
+
+/// `s` as one POSIX shell word: as is when it's plain, otherwise single-quoted.
+pub fn shell_quote(s: &str) -> String {
+    let plain = !s.is_empty()
+        && s.chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.' | '/' | ':' | '@'));
+    if plain {
+        s.to_owned()
+    } else {
+        format!("'{}'", s.replace('\'', r"'\''"))
+    }
 }
 
 /// `d` as people write it: `30m`, `1h 30m`, `45s`.

@@ -142,7 +142,7 @@ fn started(ctx: &Ctx, action: &Response<Action>, what: &str) -> Result<()> {
         .success(&format!("Started {what} ({})", action.value.id));
     ctx.out.info(&format!(
         "  Follow it with: bonsai wait {}",
-        action.value.id
+        shell_quote(&action.value.id)
     ));
     Ok(())
 }
@@ -521,7 +521,8 @@ fn offer_to_open(settings: &Settings, code: &ProblemCode, url: &str) -> Option<S
 fn create_failed_hint(f: &ActionFailure, name: &str) -> Vec<String> {
     let destroy = |id: &str| {
         format!(
-            "bonsai cluster destroy {id} --confirm {}",
+            "bonsai cluster destroy {} --confirm {}",
+            shell_quote(id),
             shell_quote(name)
         )
     };
@@ -545,7 +546,8 @@ fn create_failed_hint(f: &ActionFailure, name: &str) -> Vec<String> {
             },
             _,
         )) => format!(
-            "  Removing the failed cluster {name} started but didn't finish; follow it with: bonsai wait {act}"
+            "  Removing the failed cluster {name} started but didn't finish; follow it with: bonsai wait {}",
+            shell_quote(act)
         ),
         Some((
             CleanupOutcome::DeprovisionFailed {
@@ -557,7 +559,8 @@ fn create_failed_hint(f: &ActionFailure, name: &str) -> Vec<String> {
             destroy(id)
         ),
         Some((CleanupOutcome::Unchecked { .. }, id)) => format!(
-            "  The failed cluster {name} ({id}): stopped before checking it; see `bonsai cluster show {id}`"
+            "  The failed cluster {name} ({id}): stopped before checking it; see `bonsai cluster show {}`",
+            shell_quote(id)
         ),
         Some((CleanupOutcome::DeleteFailed, id)) => format!(
             "  Couldn't remove the failed cluster {name}; remove it with: {}",
@@ -936,7 +939,8 @@ async fn wait(ctx: &Ctx, args: ClusterWaitArgs) -> Result<()> {
 fn cluster_failed(c: &Cluster) -> anyhow::Error {
     Failed(format!(
         "{} failed; `bonsai cluster history {} --steps` shows its Actions",
-        c.name, c.id
+        c.name,
+        shell_quote(&c.id)
     ))
     .into()
 }
@@ -957,7 +961,7 @@ fn not_ready(c: &Cluster, timeout: Duration) -> anyhow::Error {
         c.name,
         c.state,
         bonsai_core::human_duration(timeout),
-        c.id
+        shell_quote(&c.id)
     ))
     .into()
 }

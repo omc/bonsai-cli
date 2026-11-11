@@ -97,17 +97,7 @@ pub fn rerun_hint(c: &CreateChoice<'_>) -> String {
     hint
 }
 
-/// `s` as one POSIX shell word: as is when it's plain, otherwise single-quoted.
-pub fn shell_quote(s: &str) -> String {
-    let plain = !s.is_empty()
-        && s.chars()
-            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.' | '/' | ':' | '@'));
-    if plain {
-        s.to_owned()
-    } else {
-        format!("'{}'", s.replace('\'', r"'\''"))
-    }
-}
+pub use bonsai_core::shell_quote;
 
 /// What became of the cluster a failed create left, as `(outcome, cluster_id,
 /// deprovision_action_id)`. The outcome is one of `removed`, `removed_by_bonsai`
