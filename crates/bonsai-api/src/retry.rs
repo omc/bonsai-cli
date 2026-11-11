@@ -96,13 +96,19 @@ pub(crate) async fn send_with_retry(
                     "request"
                 );
                 if status.is_success() {
+                    let Some(body) = body else {
+                        return Err(ApiError::Decode(format!(
+                            "the response is larger than {} MiB",
+                            MAX_BODY >> 20
+                        )));
+                    };
                     return Ok(RawResponse {
                         status: status.as_u16(),
                         headers,
                         body,
                     });
                 }
-                let err = error_from(status, &headers, body, retry_after);
+                let err = error_from(status, &headers, body.unwrap_or_default(), retry_after);
                 let retryable = is_retryable_status(&err, replayable);
                 (err, retry_after, retryable)
             }
@@ -174,20 +180,25 @@ fn is_tls(e: &reqwest::Error) -> bool {
     false
 }
 
-type Exchange = (url::Url, StatusCode, HeaderMap, Vec<u8>);
+/// The body is `None` when a success's was larger than [`MAX_BODY`].
+type Exchange = (url::Url, StatusCode, HeaderMap, Option<Vec<u8>>);
 
 /// The most of an error body kept; the rest isn't read.
 const MAX_ERROR_BODY: usize = 1 << 20;
 
-/// Sends one request and reads the body: all of it on success, at most
-/// [`MAX_ERROR_BODY`] of an error.
+/// The largest success body read. The API's pages are a few hundred KiB at most;
+/// past this the answer isn't the API's, and reading on would only fill memory.
+const MAX_BODY: usize = 64 << 20;
+
+/// Sends one request and reads the body: all of a success up to [`MAX_BODY`], at
+/// most [`MAX_ERROR_BODY`] of an error.
 async fn exchange(req: RequestBuilder) -> Result<Exchange, reqwest::Error> {
     let mut resp = req.send().await?;
     let url = resp.url().clone();
     let status = resp.status();
     let headers = resp.headers().clone();
     let body = if status.is_success() {
-        resp.bytes().await?.to_vec()
+        read_up_to(&mut resp, MAX_BODY).await?
     } else {
         let mut body = Vec::new();
         while body.len() < MAX_ERROR_BODY
@@ -196,9 +207,24 @@ async fn exchange(req: RequestBuilder) -> Result<Exchange, reqwest::Error> {
             body.extend_from_slice(&chunk);
         }
         body.truncate(MAX_ERROR_BODY);
-        body
+        Some(body)
     };
     Ok((url, status, headers, body))
+}
+
+/// The whole body, or `None` once it's longer than `max`; the rest isn't read.
+async fn read_up_to(
+    resp: &mut reqwest::Response,
+    max: usize,
+) -> Result<Option<Vec<u8>>, reqwest::Error> {
+    let mut body = Vec::new();
+    while let Some(chunk) = resp.chunk().await? {
+        if body.len() + chunk.len() > max {
+            return Ok(None);
+        }
+        body.extend_from_slice(&chunk);
+    }
+    Ok(Some(body))
 }
 
 /// Decodes an error response: a problem body becomes `Problem`, anything else `Http`.
@@ -291,5 +317,22 @@ mod tests {
             "{err:?}"
         );
         assert_eq!(attempts.load(Ordering::SeqCst), 1);
+    }
+
+    #[tokio::test]
+    async fn a_body_over_the_cap_is_not_kept() {
+        use wiremock::{Mock, MockServer, ResponseTemplate, matchers::any};
+        let server = MockServer::start().await;
+        Mock::given(any())
+            .respond_with(ResponseTemplate::new(200).set_body_bytes(vec![b'x'; 100]))
+            .mount(&server)
+            .await;
+        let http = crate::http_client().no_proxy().build().unwrap();
+        let get = || async { http.get(server.uri()).send().await.unwrap() };
+        assert_eq!(
+            read_up_to(&mut get().await, 100).await.unwrap(),
+            Some(vec![b'x'; 100])
+        );
+        assert_eq!(read_up_to(&mut get().await, 99).await.unwrap(), None);
     }
 }
