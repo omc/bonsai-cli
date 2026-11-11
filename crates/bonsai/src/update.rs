@@ -116,10 +116,12 @@ pub fn last_check(config_dir: &Path) -> Option<Timestamp> {
     Some(state.checked_at)
 }
 
+/// The check often runs before anything else has made the config folder, so it
+/// makes it the way the credentials file needs it: private to the user.
 pub fn record_check(config_dir: &Path, at: Timestamp) -> std::io::Result<()> {
-    std::fs::create_dir_all(config_dir)?;
+    bonsai_core::create_private_dir(config_dir).map_err(std::io::Error::other)?;
     let text = serde_json::to_string(&State { checked_at: at })?;
-    std::fs::write(config_dir.join(STATE_FILE), text)
+    bonsai_core::replace_file(config_dir, STATE_FILE, &text)
 }
 
 #[derive(serde::Serialize, serde::Deserialize)]
@@ -216,6 +218,27 @@ mod tests {
         assert!(opted_out(Some("1")));
         assert!(!opted_out(Some("")));
         assert!(!opted_out(None));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn recording_a_check_leaves_the_config_folder_private() {
+        use std::os::unix::fs::PermissionsExt;
+        let mode = |p: &Path| std::fs::metadata(p).unwrap().permissions().mode() & 0o777;
+        let dir = tempfile::tempdir().unwrap();
+        let at: Timestamp = "2026-10-20T12:00:00Z".parse().unwrap();
+
+        let fresh = dir.path().join("fresh/bonsai");
+        record_check(&fresh, at).unwrap();
+        assert_eq!(mode(&fresh), 0o700);
+        assert_eq!(mode(&fresh.join(STATE_FILE)), 0o600);
+
+        // One an earlier release made with the umask's mode.
+        let loose = dir.path().join("loose");
+        std::fs::create_dir(&loose).unwrap();
+        std::fs::set_permissions(&loose, std::fs::Permissions::from_mode(0o755)).unwrap();
+        record_check(&loose, at).unwrap();
+        assert_eq!(mode(&loose), 0o700);
     }
 
     #[test]

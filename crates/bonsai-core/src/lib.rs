@@ -230,8 +230,14 @@ impl From<keyring_core::Error> for ConfigError {
 
 pub type Result<T> = std::result::Result<T, ConfigError>;
 
-/// Create `dir` (and parents) with mode 0700 on unix.
-pub(crate) fn create_private_dir(dir: &std::path::Path) -> Result<()> {
+/// Create `dir` (and parents) with mode 0700 on unix. A `dir` that is already there
+/// and open to the group or to others is tightened to 0700: a release up to 0.3.1
+/// could create the config folder with the umask's mode.
+pub fn create_private_dir(dir: &std::path::Path) -> Result<()> {
+    let io = |source| ConfigError::Io {
+        path: dir.to_path_buf(),
+        source,
+    };
     let mut b = std::fs::DirBuilder::new();
     b.recursive(true);
     #[cfg(unix)]
@@ -239,10 +245,16 @@ pub(crate) fn create_private_dir(dir: &std::path::Path) -> Result<()> {
         use std::os::unix::fs::DirBuilderExt;
         b.mode(0o700);
     }
-    b.create(dir).map_err(|source| ConfigError::Io {
-        path: dir.to_path_buf(),
-        source,
-    })
+    b.create(dir).map_err(io)?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let mode = std::fs::metadata(dir).map_err(io)?.permissions().mode();
+        if mode & 0o077 != 0 {
+            std::fs::set_permissions(dir, std::fs::Permissions::from_mode(0o700)).map_err(io)?;
+        }
+    }
+    Ok(())
 }
 
 /// Replaces `dir/name` with `text`: writes a 0600 temp file in `dir`, fsyncs it, and
