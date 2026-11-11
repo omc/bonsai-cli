@@ -11,9 +11,15 @@ permissions:
 env:
   CARGO_TERM_COLOR: always
 
+# A pull request from a fork runs on GitHub's runners, not RunsOn: its code is a
+# stranger's, and RunsOn's runners are in our AWS account and share the S3 cache
+# that builds on main read. Pushes and pull requests from this repo's own branches
+# keep RunsOn. The `fork` flag is empty on a push, so those fall through to it.
 jobs:
   fmt:
-    runs-on: "runs-on=${{ github.run_id }}-fmt/cpu=2/family=c7i+m7i/image=ubuntu24-full-x64"
+    runs-on: >-
+      ${{ github.event.pull_request.head.repo.fork && 'ubuntu-24.04' ||
+      format('runs-on={0}-fmt/cpu=2/family=c7i+m7i/image=ubuntu24-full-x64', github.run_id) }}
     steps:
       - uses: actions/checkout@v6
       - uses: dtolnay/rust-toolchain@stable
@@ -23,7 +29,9 @@ jobs:
       - run: cargo fmt --all --check
 
   clippy:
-    runs-on: "runs-on=${{ github.run_id }}-clippy/cpu=4/family=c7i+m7i/image=ubuntu24-full-x64/extras=s3-cache"
+    runs-on: >-
+      ${{ github.event.pull_request.head.repo.fork && 'ubuntu-24.04' ||
+      format('runs-on={0}-clippy/cpu=4/family=c7i+m7i/image=ubuntu24-full-x64/extras=s3-cache', github.run_id) }}
     steps:
       - uses: actions/checkout@v6
       - uses: dtolnay/rust-toolchain@stable
@@ -31,7 +39,7 @@ jobs:
           toolchain: "1.90"
           components: clippy
       - uses: runs-on/action@v2
-        if: runner.os == 'Linux'
+        if: runner.os == 'Linux' && !github.event.pull_request.head.repo.fork
       - uses: Swatinem/rust-cache@v2
       - run: cargo clippy --workspace --all-targets -- -D warnings
 
@@ -45,6 +53,7 @@ jobs:
     # values stay as they are so the check names do not change.
     runs-on: >-
       ${{ matrix.os == 'macos-15' && 'macos-15' ||
+      github.event.pull_request.head.repo.fork && 'ubuntu-24.04' ||
       format('runs-on={0}-test-{1}/cpu=4/family=c7i+m7i/image=ubuntu24-full-x64/extras=s3-cache', github.run_id, strategy.job-index) }}
     env:
       BONSAI_KEYRING: "off"
@@ -57,7 +66,7 @@ jobs:
         with:
           toolchain: "1.90"
       - uses: runs-on/action@v2
-        if: runner.os == 'Linux'
+        if: runner.os == 'Linux' && !github.event.pull_request.head.repo.fork
       - uses: Swatinem/rust-cache@v2
       - uses: taiki-e/install-action@v2
         with:
@@ -65,7 +74,9 @@ jobs:
       - run: cargo nextest run --workspace
 
   deny:
-    runs-on: "runs-on=${{ github.run_id }}-deny/cpu=2/family=c7i+m7i/image=ubuntu24-full-x64"
+    runs-on: >-
+      ${{ github.event.pull_request.head.repo.fork && 'ubuntu-24.04' ||
+      format('runs-on={0}-deny/cpu=2/family=c7i+m7i/image=ubuntu24-full-x64', github.run_id) }}
     steps:
       - uses: actions/checkout@v6
       - uses: EmbarkStudios/cargo-deny-action@v2
@@ -83,9 +94,10 @@ jobs:
           - runner: ubuntu-24.04-arm
             target: aarch64-unknown-linux-musl
     # Matrix values stay as they are so the check names do not change. The arm64
-    # entry runs on Graviton.
+    # entry runs on Graviton. For a fork they are GitHub's own runner labels.
     runs-on: >-
-      ${{ matrix.runner == 'ubuntu-24.04-arm' &&
+      ${{ github.event.pull_request.head.repo.fork && matrix.runner ||
+      matrix.runner == 'ubuntu-24.04-arm' &&
       format('runs-on={0}-musl-arm/cpu=4/family=c8g.*/image=ubuntu24-full-arm64/extras=s3-cache', github.run_id) ||
       format('runs-on={0}-musl-x64/cpu=4/family=c7i+m7i/image=ubuntu24-full-x64/extras=s3-cache', github.run_id) }}
     steps:
@@ -95,7 +107,7 @@ jobs:
           toolchain: "1.90"
           targets: ${{ matrix.target }}
       - uses: runs-on/action@v2
-        if: runner.os == 'Linux'
+        if: runner.os == 'Linux' && !github.event.pull_request.head.repo.fork
       - uses: Swatinem/rust-cache@v2
         with:
           key: ${{ matrix.target }}
@@ -109,7 +121,9 @@ jobs:
   # Whether this push or PR touches what the nix build reads, for `nix`. A plain
   # diff, not paths-filter, which on a PR needs `pull-requests: read`.
   changes:
-    runs-on: "runs-on=${{ github.run_id }}-changes/cpu=2/family=c7i+m7i/image=ubuntu24-full-x64"
+    runs-on: >-
+      ${{ github.event.pull_request.head.repo.fork && 'ubuntu-24.04' ||
+      format('runs-on={0}-changes/cpu=2/family=c7i+m7i/image=ubuntu24-full-x64', github.run_id) }}
     outputs:
       nix: ${{ steps.diff.outputs.nix }}
     steps:
@@ -137,7 +151,9 @@ jobs:
     if: >-
       needs.changes.outputs.nix == 'true' ||
       github.ref == 'refs/heads/main'
-    runs-on: "runs-on=${{ github.run_id }}-nix/cpu=8/family=c7i+m7i/image=ubuntu24-full-x64"
+    runs-on: >-
+      ${{ github.event.pull_request.head.repo.fork && 'ubuntu-24.04' ||
+      format('runs-on={0}-nix/cpu=8/family=c7i+m7i/image=ubuntu24-full-x64', github.run_id) }}
     steps:
       - uses: actions/checkout@v6
       - uses: cachix/install-nix-action@v31
