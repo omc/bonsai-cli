@@ -79,7 +79,7 @@ impl std::error::Error for TimedOut {}
 ///
 /// | Code | For |
 /// |---|---|
-/// | 2 | usage: [`CoreError::Usage`], `Ambiguous`, clap, the config (1) |
+/// | 2 | usage: [`CoreError::Usage`], `Ambiguous`, clap, `invalid_parameter`, the config (1) |
 /// | 3 | `401`, `403`, [`NotLoggedIn`], a stored token pointed at another host |
 /// | 4 | `404`, `ClusterNotFound` |
 /// | 5 | an Action that failed with `timed_out`, `action_failed` or an unknown code; [`Failed`] |
@@ -168,6 +168,8 @@ fn api_code(e: &ApiError) -> u8 {
             | ProblemCode::ClusterTerminated
             | ProblemCode::IdempotencyKeyReused,
         ) => return 8,
+        // A flag's value the API checks, not the CLI: `--resolution 5m`, `--window 3d`.
+        Some(ProblemCode::InvalidParameter) => return 2,
         _ => {}
     }
     match e {
@@ -251,6 +253,9 @@ mod tests {
         let clap = clap::Error::new(clap::error::ErrorKind::UnknownArgument);
         assert_eq!(exit_code(&anyhow::Error::new(clap)), 2);
         assert_eq!(exit_code(&anyhow::Error::new(ConfigError::NoKeychain)), 2);
+        // A value the API refused is a bad flag too.
+        assert_eq!(api(400, "invalid_parameter"), 2);
+        assert_eq!(core(CoreError::Api(problem(400, "invalid_parameter"))), 2);
     }
 
     #[test]
