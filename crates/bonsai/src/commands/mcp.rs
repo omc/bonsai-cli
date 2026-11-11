@@ -626,10 +626,12 @@ impl Server {
 }
 
 /// A tool's answer: the JSON, or the error's text as a tool error the model can read.
+/// Both keep control, bidi and invisible characters out: escaped in the JSON (it
+/// parses to the same value), replaced in the error.
 fn reply(res: Result<Value>) -> Result<CallToolResult, ErrorData> {
     match res {
         Ok(v) => Ok(CallToolResult::success(vec![ContentBlock::text(
-            v.to_string(),
+            crate::output::json_string(&v),
         )])),
         Err(e) => {
             let msg = sanitize(&chain(e), false).into_owned();
