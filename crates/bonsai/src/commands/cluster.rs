@@ -900,7 +900,8 @@ async fn wait(ctx: &Ctx, args: ClusterWaitArgs) -> Result<()> {
                 let opts = wait_options(ctx, left());
                 progress
                     .drive(wait_for_action(&a.client, action, &opts, &events))
-                    .await?;
+                    .await
+                    .map_err(|e| whole_timeout(e, args.timeout))?;
             }
             WaitStep::Poll => {
                 tokio::select! {
@@ -940,6 +941,14 @@ fn cluster_failed(c: &Cluster) -> anyhow::Error {
     .into()
 }
 
+/// A timeout reports `--timeout`, not the part of it the last Action was given.
+fn whole_timeout(e: CoreError, timeout: Duration) -> CoreError {
+    match e {
+        CoreError::Timeout { action_id, .. } => CoreError::Timeout { action_id, timeout },
+        e => e,
+    }
+}
+
 /// A cluster still not ready at the timeout, with no running Action to resume:
 /// [`TimedOut`] (exit 9), pointing at `cluster wait` itself.
 fn not_ready(c: &Cluster, timeout: Duration) -> anyhow::Error {
@@ -960,6 +969,21 @@ mod tests {
     use bonsai_api::ActionErrorCode;
     use bonsai_core::Cleanup;
     use serde_json::json;
+
+    #[test]
+    fn a_wait_that_times_out_reports_the_whole_timeout() {
+        let left = CoreError::Timeout {
+            action_id: "act_1".into(),
+            timeout: Duration::from_secs(3),
+        };
+        let e = whole_timeout(left, Duration::from_secs(30 * 60));
+        assert_eq!(
+            e.to_string(),
+            "still running after 30m; resume with `bonsai wait act_1`"
+        );
+        let other = whole_timeout(CoreError::LoginDenied, Duration::from_secs(1));
+        assert!(matches!(other, CoreError::LoginDenied));
+    }
 
     fn failure(cleanup: Option<Cleanup>, replayed: bool) -> ActionFailure {
         ActionFailure {
