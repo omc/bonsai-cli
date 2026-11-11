@@ -1,5 +1,6 @@
-//! `bonsai cluster url`: the connection URL, password included, and nothing else. The only
-//! command that prints a secret; with `--write` it sets it in an env file instead.
+//! `bonsai cluster url`: the connection URL, password included, and nothing else
+//! (`{"url": …}` under `--json`). The only command that prints a secret; with
+//! `--write` it sets it in an env file instead.
 
 use anyhow::Result;
 use bonsai_core::{CoreError, connection_url, on_cluster};
@@ -52,6 +53,9 @@ pub async fn url(ctx: &Ctx, args: UrlArgs) -> Result<()> {
         }
     };
     let Some((root, target)) = target else {
+        if ctx.out.is_json() {
+            return ctx.out.json(&printed(args.env.as_deref(), &url));
+        }
         // Written raw: the URL is the data, and sanitizing it would change it.
         return ctx.out.data_line(&line(args.env.as_deref(), &url));
     };
@@ -82,6 +86,15 @@ fn line(env: Option<&str>, url: &SecretString) -> String {
     }
 }
 
+/// `--json`: `{"url": …}`, with `"variable"` under `--env NAME`.
+fn printed(env: Option<&str>, url: &SecretString) -> serde_json::Value {
+    let mut v = serde_json::json!({ "url": url.expose_secret() });
+    if let Some(name) = env {
+        v["variable"] = name.into();
+    }
+    v
+}
+
 /// A POSIX shell variable name: `[A-Za-z_][A-Za-z0-9_]*`.
 pub(super) fn is_env_name(s: &str) -> bool {
     let mut chars = s.chars();
@@ -110,5 +123,18 @@ mod tests {
         let url = SecretString::from("https://u:p@h".to_owned());
         assert_eq!(line(None, &url), "https://u:p@h");
         assert_eq!(line(Some("ES_URL"), &url), "ES_URL=https://u:p@h");
+    }
+
+    #[test]
+    fn json_is_an_object_with_the_url() {
+        let url = SecretString::from("https://u:p@h".to_owned());
+        assert_eq!(
+            printed(None, &url),
+            serde_json::json!({ "url": "https://u:p@h" })
+        );
+        assert_eq!(
+            printed(Some("ES_URL"), &url),
+            serde_json::json!({ "url": "https://u:p@h", "variable": "ES_URL" })
+        );
     }
 }

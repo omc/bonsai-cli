@@ -841,6 +841,23 @@ async fn url_env_prints_name_equals_url() {
         .assert()
         .success()
         .stdout(predicate::str::is_match(r"^ELASTICSEARCH_URL=https://[^:]+:[^@]+@.+\n$").unwrap());
+    // --json: an object, as every other command's.
+    let plain = env.authed().args(["cluster", "url", &id]).output().unwrap();
+    let json = env
+        .authed()
+        .args(["cluster", "url", &id, "--json"])
+        .output()
+        .unwrap();
+    assert_eq!(
+        stdout_json(&json),
+        serde_json::json!({ "url": text(&plain.stdout).trim() })
+    );
+    let json = env
+        .authed()
+        .args(["cluster", "url", &id, "--env", "ES_URL", "--json"])
+        .output()
+        .unwrap();
+    assert_eq!(stdout_json(&json)["variable"], "ES_URL");
     env.authed()
         .args(["cluster", "url", &id, "--env", "NOT A NAME"])
         .assert()
