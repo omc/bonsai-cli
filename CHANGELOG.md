@@ -6,6 +6,29 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-11-12
+
+### Changed
+
+- **Breaking:** `bonsai cluster url <cluster> --json` prints an object, `{"url": "…"}`, and with `--env NAME` also `"variable": "NAME"`. It used to print the same bare line as without `--json`.
+
+### Fixed
+
+- `cluster url --write` and the MCP tool `write_cluster_url` check the file's literal name against git. A name git reads as pathspec magic, such as `:(top).env`, no longer passes for the ignored `.env`.
+- Both write nothing when the API's URL has a space or a control character in it, so a line break can't add lines to the env file.
+- `bonsai skill install --project` refuses to write through a symbolic link, whether it is `.claude`, a folder below it or `SKILL.md` itself.
+- The config folder is private (mode 0700) when the update check is what creates it, and one an earlier release left open to the group or to others is tightened. The update check's state file is mode 0600.
+- A response larger than 64 MiB is refused instead of read into memory.
+- MCP tool results escape control, bidi and invisible characters in the JSON they return. It parses to the same value.
+- The MCP tools' parameter text names the values the API takes: the state `ready`, the resolutions `1m`, `30m`, `1h`, `6h`, `12h` and `1d`, and the windows `1h`, `1d`, `7d`, `14d` and `30d`.
+- A value the API refuses for a flag, such as `--resolution 5m` or `--window 3d`, exits 2 (usage) instead of 1.
+- An empty `BONSAI_CLUSTER` counts as no cluster.
+- When `cluster wait` gives up, it reports the whole `--timeout`, not the part of it the last Action was given.
+- Commands that a message suggests, such as `bonsai wait <id>`, quote the ID as one shell word.
+- Tables fit `COLUMNS` only on a terminal. Piped output is whole, even in a shell that exports `COLUMNS`.
+- A browser login is polled for an hour at most, whatever lifetime the API gives it.
+- In `key  value` output, a value with a newline in it stays on one row.
+
 ## [0.3.1] - 2026-11-09
 
 ### Changed
@@ -64,7 +87,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 - First pre-release: browser and token login, `whoami`, `doctor`, creating, showing, renaming, resizing and destroying clusters, connection URLs, usage, metrics, top search terms, Actions, the plan, region, space and release catalogue, `bonsai api`, shell completions and the Claude Code skill.
 
-[Unreleased]: https://github.com/omc/bonsai-cli/compare/v0.3.1...HEAD
+[Unreleased]: https://github.com/omc/bonsai-cli/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/omc/bonsai-cli/compare/v0.3.1...v0.4.0
 [0.3.1]: https://github.com/omc/bonsai-cli/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/omc/bonsai-cli/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/omc/bonsai-cli/compare/v0.2.0...v0.2.1
