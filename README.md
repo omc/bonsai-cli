@@ -44,7 +44,7 @@ bonsai cluster url search --write .env
 On macOS or Linux, the install script downloads the binary for your machine:
 
 ```sh
-curl --proto '=https' --tlsv1.2 -LsSf https://github.com/omc/bonsai-cli/releases/latest/download/bonsai-installer.sh | sh
+curl --proto '=https' --tlsv1.2 -LsSf https://bonsai.io/install.sh | sh
 ```
 
 To install by hand, download the archive for your machine with one of the buttons above, or from the [latest release](https://github.com/omc/bonsai-cli/releases/latest), and put `bonsai` on your `PATH`. Each release lists its checksums in `sha256.sum`. There are builds for macOS (Apple silicon and Intel) and Linux (x86-64 and ARM64). There is no Windows build.
