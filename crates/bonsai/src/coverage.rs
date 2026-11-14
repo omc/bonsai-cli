@@ -26,6 +26,7 @@ pub const COVERAGE: &[(&str, &[&str])] = &[
             "cluster history",
             "cluster wait",
             "cluster url",
+            "cluster request",
             "cluster usage",
             "cluster metrics",
             "cluster queries",
@@ -45,6 +46,7 @@ pub const COVERAGE: &[(&str, &[&str])] = &[
             "cluster wait",
             "cluster create",
             "cluster url",
+            "cluster request",
             "cluster usage",
             "cluster metrics",
             "cluster queries",
@@ -73,9 +75,15 @@ pub const COVERAGE: &[(&str, &[&str])] = &[
     ("getClusterUsage", &["cluster usage", "mcp"]),
     ("getClusterMetrics", &["cluster metrics", "mcp"]),
     ("getClusterTopQueries", &["cluster queries", "mcp"]),
-    ("listClusterCredentials", &["cluster url", "mcp"]),
+    (
+        "listClusterCredentials",
+        &["cluster url", "cluster request", "mcp"],
+    ),
     ("createClusterCredential", &[]),
-    ("getClusterCredential", &["cluster url", "mcp"]),
+    (
+        "getClusterCredential",
+        &["cluster url", "cluster request", "mcp"],
+    ),
     ("revokeClusterCredential", &[]),
     ("listPlans", &["regions", "plans", "cluster create", "mcp"]),
     // `cluster create --plan` asks only among the plan's regions.

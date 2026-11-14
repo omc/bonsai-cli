@@ -14,7 +14,7 @@ pub use rusqlite::{Connection, OptionalExtension, Row, params};
 
 /// Each entry runs once, in order; `PRAGMA user_version` records how many ran.
 /// Append new migrations; never edit one that has shipped.
-const MIGRATIONS: &[&str] = &[MIGRATION_1, MIGRATION_2, MIGRATION_3];
+const MIGRATIONS: &[&str] = &[MIGRATION_1, MIGRATION_2, MIGRATION_3, MIGRATION_4];
 
 const MIGRATION_1: &str = r#"
 CREATE TABLE accounts (
@@ -185,6 +185,27 @@ UPDATE accounts SET advanced_credentials = 0 WHERE id = 'globex';
 /// `regions`, as plans did before.
 const MIGRATION_3: &str = r#"
 ALTER TABLE plans ADD COLUMN offers TEXT NOT NULL DEFAULT '{}';
+"#;
+
+/// What `local_clusters` keeps: each cluster's indices and their documents (see
+/// `es`). `body` is the JSON an index was created with, `source` a document.
+const MIGRATION_4: &str = r#"
+CREATE TABLE es_indices (
+  cluster_id TEXT NOT NULL REFERENCES clusters(id),
+  name TEXT NOT NULL,
+  body TEXT NOT NULL DEFAULT '{}',
+  created_at TEXT NOT NULL,
+  PRIMARY KEY (cluster_id, name)
+);
+
+CREATE TABLE es_docs (
+  cluster_id TEXT NOT NULL,
+  idx TEXT NOT NULL,
+  id TEXT NOT NULL,
+  source TEXT NOT NULL,
+  PRIMARY KEY (cluster_id, idx, id),
+  FOREIGN KEY (cluster_id, idx) REFERENCES es_indices(cluster_id, name) ON DELETE CASCADE
+);
 "#;
 
 /// Opens (creating if needed) the database at `path` in WAL mode with foreign

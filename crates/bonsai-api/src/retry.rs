@@ -57,7 +57,7 @@ pub(crate) struct RawResponse {
 }
 
 /// The least time left before the deadline worth starting another attempt with.
-const MIN_ATTEMPT: Duration = Duration::from_millis(250);
+pub(crate) const MIN_ATTEMPT: Duration = Duration::from_millis(250);
 
 /// Sends the request `build` makes, retrying per `policy`.
 ///
@@ -164,7 +164,7 @@ fn is_retryable_transport(e: &reqwest::Error, replayable: bool) -> bool {
 /// Whether a TLS error (a certificate that doesn't verify, a failed handshake) is in
 /// the chain. rustls errors arrive wrapped in `io::Error`s, sometimes nested, and an
 /// `io::Error`'s `source()` skips the error it wraps, so those are unwrapped by hand.
-fn is_tls(e: &reqwest::Error) -> bool {
+pub(crate) fn is_tls(e: &reqwest::Error) -> bool {
     let mut next: Option<&(dyn std::error::Error + 'static)> = Some(e);
     while let Some(err) = next {
         if err.is::<rustls::Error>() {
@@ -213,7 +213,7 @@ async fn exchange(req: RequestBuilder) -> Result<Exchange, reqwest::Error> {
 }
 
 /// The whole body, or `None` once it's longer than `max`; the rest isn't read.
-async fn read_up_to(
+pub(crate) async fn read_up_to(
     resp: &mut reqwest::Response,
     max: usize,
 ) -> Result<Option<Vec<u8>>, reqwest::Error> {
@@ -280,7 +280,7 @@ fn is_retryable_status(err: &ApiError, replayable: bool) -> bool {
 }
 
 /// `min(max_wait, base * 2^attempt)` plus up to `base` of jitter.
-fn backoff(policy: &RetryPolicy, attempt: u32) -> Duration {
+pub(crate) fn backoff(policy: &RetryPolicy, attempt: u32) -> Duration {
     let exp = policy
         .base
         .checked_mul(2u32.saturating_pow(attempt))

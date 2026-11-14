@@ -21,6 +21,7 @@ async fn serve(public_url: Option<&str>, checkout_url: Option<&str>) -> Served {
             step_ms: 0,
             public_url: public_url.map(|u| u.parse().unwrap()),
             checkout_url: checkout_url.map(str::to_owned),
+            local_clusters: false,
         },
         "127.0.0.1:0".parse().unwrap(),
     )
