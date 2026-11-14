@@ -15,7 +15,7 @@ use std::path::PathBuf;
 use std::time::Duration;
 use url::Url;
 
-const CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
+pub(crate) const CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
 
 #[derive(Debug, Clone)]
 pub struct ClientConfig {
@@ -549,7 +549,7 @@ fn check_url(url: &Url) -> std::result::Result<(), ApiError> {
     }
 }
 
-fn read_ca_bundle(
+pub(crate) fn read_ca_bundle(
     path: &std::path::Path,
 ) -> std::result::Result<Vec<reqwest::Certificate>, ApiError> {
     let pem = std::fs::read(path)

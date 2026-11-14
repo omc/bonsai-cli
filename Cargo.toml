@@ -29,6 +29,7 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
 uuid = { version = "1", features = ["v4"] }
 url = "2"
+percent-encoding = "2"
 semver = "1"
 clap = { version = "4.6", features = ["derive", "env", "wrap_help", "string"] }
 clap_complete = "4.6"
