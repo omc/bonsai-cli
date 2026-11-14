@@ -10,6 +10,7 @@ mod env_file;
 mod mcp;
 mod misc;
 mod observe;
+mod request;
 mod skill;
 mod url;
 
@@ -69,9 +70,7 @@ impl Ctx {
             token,
             user_agent: user_agent(),
             retry,
-            ca_bundle: std::env::var_os("BONSAI_CA_BUNDLE")
-                .filter(|v| !v.is_empty())
-                .map(PathBuf::from),
+            ca_bundle: ca_bundle(),
         })?)
     }
 
@@ -147,6 +146,14 @@ pub fn user_agent() -> String {
         std::env::consts::OS,
         std::env::consts::ARCH
     )
+}
+
+/// `BONSAI_CA_BUNDLE`: a PEM file of extra root certificates, trusted for the API
+/// and for clusters alike.
+pub fn ca_bundle() -> Option<PathBuf> {
+    std::env::var_os("BONSAI_CA_BUNDLE")
+        .filter(|v| !v.is_empty())
+        .map(PathBuf::from)
 }
 
 /// Retries for `doctor` and `version`, which shouldn't hang for two minutes on an

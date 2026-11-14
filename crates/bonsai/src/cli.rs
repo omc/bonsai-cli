@@ -175,6 +175,8 @@ pub enum ClusterCommand {
     Wait(ClusterWaitArgs),
     /// Print a cluster's connection URL, password included, or write it to a file
     Url(UrlArgs),
+    /// Send a request to the cluster's own API (Elasticsearch or OpenSearch)
+    Request(RequestArgs),
     /// Docs, shards and size against the plan's limits, over time
     Usage(UsageArgs),
     /// Request rates, errors, traffic and latency over time
@@ -304,6 +306,34 @@ pub struct UrlArgs {
     /// ignored by git; it's left readable only by you
     #[arg(long, value_name = "FILE")]
     pub write: Option<String>,
+}
+
+#[derive(Debug, Args)]
+pub struct RequestArgs {
+    /// The cluster's ID or name
+    pub cluster: String,
+    /// The HTTP method, e.g. GET
+    pub method: String,
+    /// The path on the cluster, e.g. '/_cat/indices?v'
+    pub path: String,
+    /// The request body; @FILE reads a file, - reads stdin. Sent as it is, but for
+    /// the final newline _bulk and _msearch need
+    #[arg(short = 'd', long = "data", value_name = "BODY")]
+    pub data: Option<String>,
+    /// An extra header, 'Name: value'; repeatable
+    #[arg(short = 'H', long = "header", value_name = "NAME: VALUE")]
+    pub headers: Vec<String>,
+    /// The credential's ID (default: the cluster's default credential)
+    #[arg(long, value_name = "ID")]
+    pub credential: Option<String>,
+    /// The index in the path, to delete it or to run _delete_by_query on it; needed
+    /// when prompts are off
+    #[arg(long, value_name = "INDEX")]
+    pub confirm: Option<String>,
+    /// Give up waiting for the cluster after this long (exit 9); it may still apply
+    /// the request
+    #[arg(long, value_name = "D", default_value = "5m", value_parser = parse_nonzero_duration)]
+    pub timeout: Duration,
 }
 
 #[derive(Debug, Args)]
@@ -467,10 +497,77 @@ pub fn parse_duration(s: &str) -> Result<Duration, String> {
     Duration::try_from(d).map_err(|_| format!("{s:?} is negative"))
 }
 
+/// [`parse_duration`], but not zero: a deadline that has passed before anything is
+/// sent would report a request that never left as one that may have been applied.
+fn parse_nonzero_duration(s: &str) -> Result<Duration, String> {
+    let d = parse_duration(s)?;
+    if d.is_zero() {
+        return Err(format!("{s:?} is zero; it must be more than zero"));
+    }
+    Ok(d)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use clap::CommandFactory;
+
+    #[test]
+    fn cluster_request_takes_a_cluster_a_method_and_a_path() {
+        let cli = Cli::try_parse_from([
+            "bonsai",
+            "cluster",
+            "request",
+            "search",
+            "post",
+            "/p/_bulk",
+            "-d",
+            "-",
+            "-H",
+            "X-A: 1",
+            "-H",
+            "X-B: 2",
+            "--confirm",
+            "p",
+            "--credential",
+            "cred-1",
+        ])
+        .unwrap();
+        let Command::Cluster(ClusterCommand::Request(a)) = cli.command else {
+            unreachable!()
+        };
+        assert_eq!(
+            (a.cluster.as_str(), a.method.as_str(), a.path.as_str()),
+            ("search", "post", "/p/_bulk")
+        );
+        assert_eq!(a.data.as_deref(), Some("-"));
+        assert_eq!(a.headers, ["X-A: 1", "X-B: 2"]);
+        assert_eq!(a.confirm.as_deref(), Some("p"));
+        assert_eq!(a.credential.as_deref(), Some("cred-1"));
+        assert_eq!(a.timeout, Duration::from_secs(300));
+        // A deadline of zero would pass before anything was sent.
+        let with_timeout = |t: &str| {
+            Cli::try_parse_from([
+                "bonsai",
+                "cluster",
+                "request",
+                "c",
+                "GET",
+                "/",
+                "--timeout",
+                t,
+            ])
+        };
+        assert!(with_timeout("0s").is_err());
+        let Command::Cluster(ClusterCommand::Request(a)) = with_timeout("90s").unwrap().command
+        else {
+            unreachable!()
+        };
+        assert_eq!(a.timeout, Duration::from_secs(90));
+        // The cluster is always named: BONSAI_CLUSTER can't stand in for the first
+        // of three positionals.
+        assert!(Cli::try_parse_from(["bonsai", "cluster", "request", "GET", "/"]).is_err());
+    }
 
     #[test]
     fn the_tree_is_valid() {
