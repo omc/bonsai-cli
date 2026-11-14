@@ -32,10 +32,19 @@ pub struct Mock {
 impl Mock {
     /// A fresh database in a temp dir, `step_ms` 0, port 0.
     pub async fn start() -> Self {
-        Self::start_with(0).await
+        Self::start_opts(0, false).await
     }
 
     pub async fn start_with(step_ms: u64) -> Self {
+        Self::start_opts(step_ms, false).await
+    }
+
+    /// With `local_clusters`: credential URLs point at the mock, which answers them.
+    pub async fn start_local() -> Self {
+        Self::start_opts(0, true).await
+    }
+
+    async fn start_opts(step_ms: u64, local_clusters: bool) -> Self {
         let dir = tempfile::tempdir().expect("tempdir");
         let db_path = dir.path().join("mock.sqlite");
         let addr: SocketAddr = "127.0.0.1:0".parse().unwrap();
@@ -45,6 +54,7 @@ impl Mock {
                 step_ms,
                 public_url: None,
                 checkout_url: None,
+                local_clusters,
             },
             addr,
         )

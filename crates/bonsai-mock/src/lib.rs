@@ -5,6 +5,7 @@
 
 pub mod db;
 pub mod engine;
+pub mod es;
 pub mod html;
 pub mod http;
 pub mod ids;
@@ -36,6 +37,10 @@ pub struct MockOptions {
     /// is this prefix and a fake Stripe session ID, not the mock's own
     /// checkout page.
     pub checkout_url: Option<String>,
+    /// Answer a small part of each cluster's own API on this port too, and point
+    /// credential URLs at it (see [`es`]). Off, a credential's URL names a host
+    /// that resolves nowhere.
+    pub local_clusters: bool,
 }
 
 pub struct MockHandle {
@@ -67,6 +72,7 @@ struct Inner {
     origin: Url,
     admin_token: String,
     checkout_url: Option<String>,
+    local_clusters: bool,
     limiter: RateLimiter,
 }
 
@@ -77,6 +83,7 @@ impl AppState {
         origin: Url,
         admin_token: String,
         checkout_url: Option<String>,
+        local_clusters: bool,
     ) -> Self {
         Self {
             inner: Arc::new(Inner {
@@ -85,6 +92,7 @@ impl AppState {
                 origin,
                 admin_token,
                 checkout_url,
+                local_clusters,
                 limiter: RateLimiter::default(),
             }),
         }
@@ -113,6 +121,12 @@ impl AppState {
         self.inner.checkout_url.as_deref()
     }
 
+    /// The origin credential URLs point at, when the mock serves its clusters' own
+    /// API itself (`local_clusters`).
+    pub fn cluster_origin(&self) -> Option<&Url> {
+        self.inner.local_clusters.then_some(&self.inner.origin)
+    }
+
     /// An absolute URL on the mock for `path` (`"/v1/actions/act_..."`).
     pub fn url(&self, path: &str) -> String {
         format!(
@@ -135,6 +149,8 @@ impl AppState {
 ///   one, as the Bonsai API answers an unknown route.
 /// - `/v1/openapi.json`, `/_mock/*` and unknown paths (404 `not_found`) are
 ///   outside the rate limits, so they never take from `rate_limit_next`.
+/// - With `local_clusters`, a request that matches none of these and carries
+///   `Authorization: Basic` goes to the fake cluster API ([`es`]).
 pub fn app(state: AppState) -> Router {
     let by_ip = routes::root::router()
         .method_not_allowed_fallback(|| async { problem::not_found() })
@@ -160,7 +176,7 @@ pub fn app(state: AppState) -> Router {
         .merge(login)
         .merge(by_token)
         .merge(unlimited)
-        .fallback(|| async { problem::not_found() })
+        .fallback(es::fallback)
         .layer(from_fn_with_state(state.clone(), only_known_hosts))
         .with_state(state)
 }
@@ -258,6 +274,7 @@ pub async fn spawn(opts: MockOptions, addr: SocketAddr) -> anyhow::Result<MockHa
         origin.clone(),
         admin_token.clone(),
         opts.checkout_url,
+        opts.local_clusters,
     );
     let router = app(state);
     let (shutdown, rx) = tokio::sync::oneshot::channel::<()>();

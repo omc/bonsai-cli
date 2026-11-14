@@ -2,7 +2,8 @@
 //! the admin API and the `bonsai-mock scenario` CLI all see the same values.
 //!
 //! Known keys: `fail_next` (`"payment_failed"|"action_failed"|"timed_out"`),
-//! `metrics_unavailable` (bool), `rate_limit_next` (int).
+//! `metrics_unavailable` (bool), `rate_limit_next` (int), `cluster_status_next`
+//! (a status from 400 to 599).
 //!
 //! `fail_next` is taken once: `payment_failed` by the next `createCluster` that
 //! passes validation (a `422 payment_failed`, nothing built), the other two by
@@ -18,6 +19,9 @@
 //! takes one, whatever its token and method: the root, the login endpoints,
 //! and a wrong method (which would otherwise be a 404). An
 //! unknown `/v1` path, `/v1/openapi.json` and everything under `/_mock` don't.
+//!
+//! `cluster_status_next` is taken once, by the next request to a local cluster's
+//! own API (see `es`) that carries a live credential: it answers with that status.
 
 use std::collections::BTreeMap;
 
@@ -25,7 +29,12 @@ use rusqlite::{Connection, OptionalExtension, TransactionBehavior};
 use serde_json::Value;
 
 /// Every scenario key, as the admin API and `bonsai-mock scenario` take them.
-pub const KEYS: &[&str] = &["fail_next", "metrics_unavailable", "rate_limit_next"];
+pub const KEYS: &[&str] = &[
+    "fail_next",
+    "metrics_unavailable",
+    "rate_limit_next",
+    "cluster_status_next",
+];
 
 /// The values `fail_next` takes.
 pub const FAIL_NEXT: &[&str] = &["payment_failed", "action_failed", "timed_out"];
@@ -36,6 +45,7 @@ pub fn validate(key: &str, value: &Value) -> Result<(), String> {
         "fail_next" => value.as_str().is_some_and(|v| FAIL_NEXT.contains(&v)),
         "metrics_unavailable" => value.is_boolean(),
         "rate_limit_next" => value.is_u64(),
+        "cluster_status_next" => value.as_u64().is_some_and(|s| (400..=599).contains(&s)),
         _ => {
             return Err(format!(
                 "unknown scenario {key}; scenarios are: {}",
@@ -49,6 +59,7 @@ pub fn validate(key: &str, value: &Value) -> Result<(), String> {
     Err(match key {
         "fail_next" => format!("fail_next must be one of {}", FAIL_NEXT.join(", ")),
         "metrics_unavailable" => "metrics_unavailable must be true or false".into(),
+        "cluster_status_next" => "cluster_status_next must be a status from 400 to 599".into(),
         _ => "rate_limit_next must be a whole number, 0 or more".into(),
     })
 }
@@ -112,6 +123,20 @@ pub fn take_counter(conn: &Connection, key: &str) -> rusqlite::Result<bool> {
     Ok(true)
 }
 
+/// Takes a one-shot status scenario such as `cluster_status_next`: when `key`
+/// holds a status, clears it and returns it.
+pub fn take_status(conn: &Connection, key: &str) -> rusqlite::Result<Option<u16>> {
+    let tx = rusqlite::Transaction::new_unchecked(conn, TransactionBehavior::Immediate)?;
+    let status = get(&tx, key)?
+        .and_then(|v| v.as_u64())
+        .and_then(|s| u16::try_from(s).ok());
+    if status.is_some() {
+        clear(&tx, key)?;
+    }
+    tx.commit()?;
+    Ok(status)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -121,6 +146,18 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let c = crate::db::open(&dir.path().join("s.sqlite")).unwrap();
         (dir, c)
+    }
+
+    #[test]
+    fn take_status_is_taken_once() {
+        let (_d, c) = conn();
+        assert_eq!(take_status(&c, "cluster_status_next").unwrap(), None);
+        assert!(validate("cluster_status_next", &json!(429)).is_ok());
+        assert!(validate("cluster_status_next", &json!(200)).is_err());
+        assert!(validate("cluster_status_next", &json!("429")).is_err());
+        set(&c, "cluster_status_next", &json!(429)).unwrap();
+        assert_eq!(take_status(&c, "cluster_status_next").unwrap(), Some(429));
+        assert_eq!(take_status(&c, "cluster_status_next").unwrap(), None);
     }
 
     #[test]

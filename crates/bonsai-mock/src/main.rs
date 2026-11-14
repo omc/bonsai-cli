@@ -42,6 +42,11 @@ enum Command {
         /// e.g. https://checkout.stripe.com/c/pay/, not the mock's checkout page.
         #[arg(long, value_name = "PREFIX")]
         checkout_url: Option<String>,
+        /// Answer a small part of each cluster's own API (Elasticsearch's) on this
+        /// port too, and point credential URLs here, so `bonsai cluster request`
+        /// has a cluster to talk to.
+        #[arg(long)]
+        local_clusters: bool,
     },
     /// Manage API tokens.
     Token {
@@ -59,8 +64,8 @@ enum Command {
 #[derive(Subcommand)]
 enum ScenarioCommand {
     /// Set KEY to VALUE: fail_next (payment_failed, action_failed,
-    /// timed_out), metrics_unavailable (true, false) or rate_limit_next (a
-    /// count).
+    /// timed_out), metrics_unavailable (true, false), rate_limit_next (a
+    /// count) or cluster_status_next (a status from 400 to 599).
     Set {
         key: String,
         /// Read as JSON, or as a string when it isn't JSON.
@@ -105,7 +110,19 @@ async fn main() -> anyhow::Result<()> {
             reset,
             public_url,
             checkout_url,
-        } => serve(cli.db, port, step_ms, reset, public_url, checkout_url).await,
+            local_clusters,
+        } => {
+            serve(
+                cli.db,
+                port,
+                step_ms,
+                reset,
+                public_url,
+                checkout_url,
+                local_clusters,
+            )
+            .await
+        }
         Command::Token {
             command:
                 TokenCommand::Create {
@@ -156,6 +173,7 @@ async fn serve(
     reset: bool,
     public_url: Option<url::Url>,
     checkout_url: Option<String>,
+    local_clusters: bool,
 ) -> anyhow::Result<()> {
     if reset {
         db::remove(&db_path).with_context(|| format!("removing {}", db_path.display()))?;
@@ -166,6 +184,7 @@ async fn serve(
             step_ms,
             public_url,
             checkout_url,
+            local_clusters,
         },
         SocketAddr::from((Ipv4Addr::LOCALHOST, port)),
     )
@@ -173,6 +192,9 @@ async fn serve(
 
     println!("bonsai-mock serving {}", handle.base_url);
     println!("database: {}", db_path.display());
+    if local_clusters {
+        println!("local clusters: credential URLs point at this server");
+    }
     if handle.seeded_tokens.is_empty() {
         println!(
             "Existing database: its tokens were printed when it was created. \
