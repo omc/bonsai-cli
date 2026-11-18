@@ -6,6 +6,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-11-18
+
+### Added
+
+- `bonsai cluster request <cluster> <METHOD> <path>` sends one request to the cluster's own API, Elasticsearch's or OpenSearch's, with the cluster's credential, and prints the answer. It's how you create indices, load documents and search without handling the password: `-d` gives the body (the text, `@FILE`, or `-` for stdin), `-H` adds headers, and `--credential`, `--confirm` and `--timeout` (default `5m`) do what they say.
+- The password never leaves the CLI: it is not in stdout, stderr, `-vv` logs or error text. Requests go over https only (plain http for loopback), redirects are not followed, and `-H Authorization`, `TRACE` and `CONNECT` are refused.
+- Deleting needs the name typed back. `DELETE /<index>` and `_delete_by_query` prompt for the target on a terminal and need `--confirm <index>` without one.
+- Exit codes for `cluster request`: 3 for a 401 or 403 from the cluster, 4 for a 404, 9 when `--timeout` runs out, 2 for usage, 1 otherwise.
+- Only what is safe to repeat is retried: a connection that was never made, and a 429. A failure says whether the request left.
+- The agent skill has a Data section that teaches `cluster request`. Run `bonsai skill install` again to update it.
+- `bonsai-mock serve --local-clusters` answers a small part of the cluster API (indices, documents, `_bulk`, `_search`, `_count`, `_delete_by_query`), for tests.
+
 ## [0.4.0] - 2026-11-12
 
 ### Changed
@@ -87,7 +99,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 - First pre-release: browser and token login, `whoami`, `doctor`, creating, showing, renaming, resizing and destroying clusters, connection URLs, usage, metrics, top search terms, Actions, the plan, region, space and release catalogue, `bonsai api`, shell completions and the Claude Code skill.
 
-[Unreleased]: https://github.com/omc/bonsai-cli/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/omc/bonsai-cli/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/omc/bonsai-cli/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/omc/bonsai-cli/compare/v0.3.1...v0.4.0
 [0.3.1]: https://github.com/omc/bonsai-cli/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/omc/bonsai-cli/compare/v0.2.1...v0.3.0
