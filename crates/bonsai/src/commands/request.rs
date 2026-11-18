@@ -10,11 +10,11 @@ use std::io::{IsTerminal, Read};
 
 use anyhow::{Context, Result};
 use bonsai_api::{
-    EngineClient, EngineConfig, EngineError, EnginePath, EngineResponse, RetryPolicy,
+    EngineClient, EngineConfig, EngineError, EnginePath, EngineResponse, RetryPolicy, prepare_body,
 };
 use bonsai_core::{CoreError, human_duration, shell_quote};
 use reqwest::Method;
-use reqwest::header::{AUTHORIZATION, CONTENT_TYPE, HeaderMap, HeaderName, HeaderValue};
+use reqwest::header::{AUTHORIZATION, HeaderMap, HeaderName, HeaderValue};
 use serde_json::Value;
 
 use super::cluster::prompt_error;
@@ -131,88 +131,6 @@ async fn read_body(ctx: &Ctx, data: &str) -> Result<Vec<u8>> {
     Ok(data.as_bytes().to_vec())
 }
 
-/// Whether the path's endpoint takes NDJSON: `_bulk`, `_msearch`, `_msearch/template`.
-fn takes_ndjson(path: &EnginePath) -> bool {
-    let segments = path.segments();
-    match segments.as_slice() {
-        [.., last] if last == "_bulk" || last == "_msearch" => true,
-        [.., before, last] => before == "_msearch" && last == "template",
-        _ => false,
-    }
-}
-
-/// The body as it's sent, and its `Content-Type` unless `-H` set one. An NDJSON
-/// endpoint refuses a body that doesn't end in a newline, so one is added.
-fn prepare_body(mut body: Vec<u8>, path: &EnginePath, headers: &mut HeaderMap) -> Vec<u8> {
-    let ndjson = takes_ndjson(path);
-    if ndjson && !body.ends_with(b"\n") {
-        body.push(b'\n');
-    }
-    if !headers.contains_key(CONTENT_TYPE) {
-        let kind = if ndjson {
-            "application/x-ndjson"
-        } else {
-            "application/json"
-        };
-        headers.insert(CONTENT_TYPE, HeaderValue::from_static(kind));
-    }
-    body
-}
-
-/// What a request removes wholesale, if it does: the target of `DELETE /{target}`
-/// (an index, several, or `_all`), or of `/{target}/…/_delete_by_query`.
-///
-/// The path is read twice: as the engine routes it, and as a hop that decodes it
-/// first would (`/plants/%2F` is `/plants` to such a hop). Either reading is
-/// enough to ask.
-///
-/// When the two name different targets and the second could be real indices
-/// (`/plants%2F` is `plants/` as written and `plants` decoded first), the request
-/// is refused: whichever name was typed back, it might not be the index that goes.
-/// A date-math name, whose slash has to be encoded (`<logs-{now/d}>`), isn't such
-/// a case: decoded first it splits into pieces that name nothing, so the name as
-/// written is the one asked for.
-///
-/// Nothing else is classified. Sorting the rest of two engines' APIs into safe
-/// and unsafe would be a promise this CLI can't keep.
-fn destroys(method: &Method, path: &EnginePath) -> Result<Option<String>> {
-    let as_routed = target(method, &path.segments());
-    let decoded_first = target(method, &path.segments_if_decoded_first());
-    match (as_routed, decoded_first) {
-        (Some(a), Some(b)) if a != b && could_be_indices(&b) => Err(usage(format!(
-            "{method} {path} could remove {a} or {b}, depending on where the path is decoded; \
-             write the path so that it names one of them plainly"
-        ))),
-        (Some(target), _) | (None, Some(target)) => Ok(Some(target)),
-        (None, None) => Ok(None),
-    }
-}
-
-/// Whether `target` could name real indices as a cluster would resolve it: every
-/// name in the list is either a whole date-math expression (`<…>`), or has none
-/// of these characters, which Elasticsearch and OpenSearch refuse in a name.
-///
-/// The pieces a date-math name splits into at its encoded slash (`<logs-{now` and
-/// `d}>`) are neither, and a cluster refuses a list with such a piece in it whole.
-/// The check errs towards "could": a name it wrongly takes for real only costs a
-/// refusal.
-fn could_be_indices(target: &str) -> bool {
-    let mut names = target.split(',').filter(|name| !name.is_empty()).peekable();
-    names.peek().is_some()
-        && names.all(|name| {
-            let date_math = name.len() > 2 && name.starts_with('<') && name.ends_with('>');
-            date_math || !name.contains(['/', '\\', '"', '<', '>', '|', ' ', '#'])
-        })
-}
-
-fn target(method: &Method, segments: &[String]) -> Option<String> {
-    match segments {
-        [target] if *method == Method::DELETE => Some(target.clone()),
-        [target, .., last] if last == "_delete_by_query" => Some(target.clone()),
-        _ => None,
-    }
-}
-
 /// Has the target of a destructive request typed back: `--confirm`, or a prompt
 /// on a terminal. As with `cluster destroy`, prompts off and no flag is a refusal.
 fn confirm(
@@ -222,7 +140,7 @@ fn confirm(
     path: &EnginePath,
     given: Option<&str>,
 ) -> Result<()> {
-    let Some(target) = destroys(method, path)? else {
+    let Some(target) = path.removes(method).map_err(|e| usage(e.to_string()))? else {
         return Ok(());
     };
     match given {
@@ -312,7 +230,7 @@ fn failure(resp: &EngineResponse, path: &EnginePath) -> anyhow::Error {
 /// What an error body says went wrong, in one line: Elasticsearch's
 /// `error.reason`, a string `error` or `message`, or the first line of a text body
 /// (not of an HTML page).
-fn reason(body: &[u8]) -> Option<String> {
+pub(super) fn reason(body: &[u8]) -> Option<String> {
     let text = match serde_json::from_slice::<Value>(body) {
         Ok(v) => {
             let error = v.get("error");
@@ -334,7 +252,7 @@ fn reason(body: &[u8]) -> Option<String> {
 
 /// What to do about a status, from the status alone: the CLI keeps no list of the
 /// endpoints Bonsai blocks.
-fn hint(status: u16, retries: u32, midway: bool) -> Option<Vec<String>> {
+pub(super) fn hint(status: u16, retries: u32, midway: bool) -> Option<Vec<String>> {
     let lines = match status {
         401 => vec![
             "The cluster refused the credential. It may have been revoked.".to_owned(),
@@ -369,183 +287,6 @@ fn times(n: u32) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    fn path(s: &str) -> EnginePath {
-        EnginePath::parse(s).unwrap()
-    }
-
-    #[test]
-    fn only_whole_index_deletes_and_delete_by_query_need_confirming() {
-        let asks = |m: Method, p: &str| destroys(&m, &path(p)).unwrap();
-        assert_eq!(asks(Method::DELETE, "/products"), Some("products".into()));
-        assert_eq!(asks(Method::DELETE, "/products/"), Some("products".into()));
-        assert_eq!(asks(Method::DELETE, "/a,b?timeout=1m"), Some("a,b".into()));
-        assert_eq!(asks(Method::DELETE, "/_all"), Some("_all".into()));
-        assert_eq!(asks(Method::DELETE, "/*"), Some("*".into()));
-        // What's confirmed is what's sent: dots are resolved first.
-        assert_eq!(
-            asks(Method::DELETE, "/logs/../products"),
-            Some("products".into())
-        );
-        assert_eq!(
-            asks(Method::DELETE, "/x/%2e%2e/products"),
-            Some("products".into())
-        );
-        assert_eq!(
-            asks(Method::POST, "/products/_delete_by_query"),
-            Some("products".into())
-        );
-        assert_eq!(
-            asks(Method::GET, "/a,b/_doc/_delete_by_query?conflicts=proceed"),
-            Some("a,b".into())
-        );
-        // A hop that decodes before it routes would read these as the same requests.
-        assert_eq!(asks(Method::DELETE, "/plants/%2F"), Some("plants".into()));
-        assert_eq!(
-            asks(Method::DELETE, "/x/..%2Fplants"),
-            Some("plants".into())
-        );
-        assert_eq!(
-            asks(Method::POST, "/plants/_delete_by_query%2F"),
-            Some("plants".into())
-        );
-        // Two readings, two targets: refused, whatever --confirm says.
-        for ambiguous in [
-            "/logs%2F..%2Fplants",
-            "/plants%2F",
-            "/x%2F..%2Fplants/_delete_by_query",
-        ] {
-            let method = if ambiguous.ends_with("_delete_by_query") {
-                Method::POST
-            } else {
-                Method::DELETE
-            };
-            assert!(destroys(&method, &path(ambiguous)).is_err(), "{ambiguous}");
-        }
-        // An encoded character that isn't a slash or a dot reads the same both ways.
-        assert_eq!(asks(Method::DELETE, "/my%2Dindex"), Some("my-index".into()));
-        assert_eq!(asks(Method::DELETE, "/a%2Cb"), Some("a,b".into()));
-        // A date-math name needs its slash encoded. Decoded first it splits into
-        // pieces that could name no index, so the name as written is what's asked for.
-        let date_math = "/%3Clogs-%7Bnow%2Fd%7D%3E";
-        assert_eq!(
-            asks(Method::DELETE, date_math),
-            Some("<logs-{now/d}>".into())
-        );
-        assert_eq!(
-            asks(Method::POST, &format!("{date_math}/_delete_by_query")),
-            Some("<logs-{now/d}>".into())
-        );
-        assert_eq!(
-            asks(
-                Method::POST,
-                &format!("{date_math},{}/_delete_by_query", &date_math[1..])
-            ),
-            Some("<logs-{now/d}>,<logs-{now/d}>".into())
-        );
-        // So does a name with a literal percent sign in it.
-        assert_eq!(asks(Method::DELETE, "/a%252Fb"), Some("a%2Fb".into()));
-        // A list of a plain name and a date-math one is asked for as written too.
-        assert_eq!(
-            asks(
-                Method::POST,
-                &format!("/plants,{}/_delete_by_query", &date_math[1..])
-            ),
-            Some("plants,<logs-{now/d}>".into())
-        );
-        // But a whole date-math name with no slash in it is a real index to a hop
-        // that decodes first: with a second reading that differs, refused.
-        for (method, ambiguous) in [
-            (Method::DELETE, "/%3Clogs-%7Bnow%7D%3E%2F"),
-            (Method::DELETE, "/%3Cplants%3E%2F"),
-            (Method::DELETE, "/%2F%3Clogs-%7Bnow%7D%3E"),
-            (Method::DELETE, "/plants,%2F"),
-            (Method::POST, "/%3Clogs-%7Bnow%7D%3E%2F/_delete_by_query"),
-        ] {
-            assert!(destroys(&method, &path(ambiguous)).is_err(), "{ambiguous}");
-        }
-        // What makes a second reading worth refusing over: it could be real indices.
-        for real in [
-            "plants",
-            "a,b",
-            "pla*",
-            "_all",
-            "logs-2026.11.13",
-            ".kibana",
-            "<logs-{now}>",
-            "<plants>",
-            "plants,<logs-{now}>",
-            "plants,",
-        ] {
-            assert!(could_be_indices(real), "{real}");
-        }
-        for not in [
-            "",
-            ",",
-            "<logs-{now",
-            "d}>",
-            "plants,<logs-{now",
-            "<>",
-            "a/b",
-            "a b",
-            "a#b",
-            "a\\b",
-            "a|b",
-            "a\"b",
-        ] {
-            assert!(!could_be_indices(not), "{not}");
-        }
-        for (m, p) in [
-            (Method::DELETE, "/products/_doc/1"),
-            (Method::DELETE, "/_search/scroll"),
-            (Method::DELETE, "/"),
-            (Method::GET, "/products"),
-            (Method::HEAD, "/products"),
-            (Method::PUT, "/products"),
-            (Method::POST, "/products/_bulk"),
-            (Method::POST, "/products/_close"),
-            (Method::POST, "/_delete_by_query"),
-        ] {
-            assert_eq!(asks(m.clone(), p), None, "{m} {p}");
-        }
-    }
-
-    #[test]
-    fn ndjson_endpoints_get_their_content_type_and_final_newline() {
-        let prepared = |p: &str, body: &str, given: Option<&'static str>| {
-            let mut headers = HeaderMap::new();
-            if let Some(kind) = given {
-                headers.insert(CONTENT_TYPE, HeaderValue::from_static(kind));
-            }
-            let body = prepare_body(body.as_bytes().to_vec(), &path(p), &mut headers);
-            (
-                String::from_utf8(body).unwrap(),
-                headers[CONTENT_TYPE].to_str().unwrap().to_owned(),
-            )
-        };
-        let ndjson = "application/x-ndjson".to_owned();
-        assert_eq!(
-            prepared("/_bulk", "{}\n{}", None),
-            ("{}\n{}\n".into(), ndjson.clone())
-        );
-        assert_eq!(
-            prepared("/p/_bulk?refresh=true", "{}\n", None),
-            ("{}\n".into(), ndjson.clone())
-        );
-        assert_eq!(prepared("/_msearch", "{}", None).1, ndjson);
-        assert_eq!(prepared("/p/_msearch/template", "{}", None).1, ndjson);
-        // Everything else is JSON and goes out untouched.
-        assert_eq!(
-            prepared("/p/_search", "{}", None),
-            ("{}".into(), "application/json".into())
-        );
-        assert_eq!(prepared("/p/_doc/1", "", None).0, "");
-        // -H wins, and the newline is still the endpoint's rule.
-        assert_eq!(
-            prepared("/_bulk", "{}", Some("text/plain")),
-            ("{}\n".into(), "text/plain".into())
-        );
-    }
 
     #[test]
     fn headers_are_parsed_and_authorization_refused() {

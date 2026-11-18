@@ -11,6 +11,7 @@ pub mod retry;
 pub use client::{Client, ClientConfig, ClusterQuery, Response, http_client, is_loopback_host};
 pub use engine::{
     EngineClient, EngineConfig, EngineError, EnginePath, EngineResponse, MAX_ENGINE_BODY,
+    prepare_body,
 };
 pub use enums::*;
 pub use models::*;
