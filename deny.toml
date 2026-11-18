@@ -13,6 +13,10 @@ ignore = [
   { id = "RUSTSEC-2026-0370", reason = "zvariant via zbus 5 in zbus-secret-service-keyring-store and secret-service; fixed by zbus 6, which neither uses yet" },
   { id = "RUSTSEC-2026-0371", reason = "zbus_names via zbus 5 in zbus-secret-service-keyring-store and secret-service; fixed by zbus 6, which neither uses yet" },
   { id = "RUSTSEC-2026-0372", reason = "zvariant_derive via zbus 5 in zbus-secret-service-keyring-store and secret-service; fixed by zbus 6, which neither uses yet" },
+  # chrono was declared unmaintained on every version (2026-11). rmcp 3.9.0
+  # depends on it and turns on schemars' chrono04 feature; our own code uses jiff.
+  # Drop this once an rmcp release is without it.
+  { id = "RUSTSEC-2026-0543", reason = "chrono via rmcp 3.9, which also turns it on in schemars; unmaintained, not a vulnerability, and no rmcp release is without it" },
 ]
 
 [licenses]
