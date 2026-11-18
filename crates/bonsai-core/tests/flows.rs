@@ -52,6 +52,7 @@ impl Env {
                 step_ms,
                 public_url: None,
                 checkout_url: None,
+                local_clusters: false,
             },
             addr,
         )

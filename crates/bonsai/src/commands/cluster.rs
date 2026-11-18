@@ -89,6 +89,7 @@ pub async fn run(ctx: &Ctx, command: ClusterCommand) -> Result<()> {
         ClusterCommand::History(args) => history(ctx, args).await,
         ClusterCommand::Wait(args) => wait(ctx, args).await,
         ClusterCommand::Url(args) => super::url::url(ctx, args).await,
+        ClusterCommand::Request(args) => super::request::request(ctx, args).await,
         ClusterCommand::Usage(args) => super::observe::usage(ctx, args).await,
         ClusterCommand::Metrics(args) => super::observe::metrics(ctx, args).await,
         ClusterCommand::Queries(args) => super::observe::queries(ctx, args).await,

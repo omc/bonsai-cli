@@ -3,6 +3,7 @@
 //! `--write` it sets it in an env file instead.
 
 use anyhow::Result;
+use bonsai_api::Client;
 use bonsai_core::{CoreError, connection_url, on_cluster};
 use secrecy::{ExposeSecret, SecretString};
 
@@ -30,28 +31,13 @@ pub async fn url(ctx: &Ctx, args: UrlArgs) -> Result<()> {
         None => None,
     };
     let a = ctx.authed().await?;
-    let client = &a.client;
-    let arg = &args.cluster.cluster;
-    let url = match args.credential.as_deref() {
-        // The cluster's own request first; its 404 can only mean no such cluster.
-        None => {
-            ctx.abortable(async {
-                Ok(on_cluster(client, arg, |id| async move {
-                    connection_url(client, &id, None).await
-                })
-                .await?)
-            })
-            .await?
-        }
-        // A 404 here could be the credential's, so the cluster is found first.
-        Some(credential) => {
-            let cluster = resolve(ctx, client, arg).await?.value;
-            ctx.abortable(async {
-                Ok(connection_url(client, &cluster.id, Some(credential)).await?)
-            })
-            .await?
-        }
-    };
+    let url = fetch(
+        ctx,
+        &a.client,
+        &args.cluster.cluster,
+        args.credential.as_deref(),
+    )
+    .await?;
     let Some((root, target)) = target else {
         if ctx.out.is_json() {
             return ctx.out.json(&printed(args.env.as_deref(), &url));
@@ -76,6 +62,37 @@ pub async fn url(ctx: &Ctx, args: UrlArgs) -> Result<()> {
     };
     ctx.out.success(&format!("{how} {var} in {}", written.path));
     Ok(())
+}
+
+/// The connection URL of `credential` on the cluster `arg` names, or of the
+/// cluster's default credential. `cluster url` prints it; `cluster request` sends
+/// with it.
+pub(super) async fn fetch(
+    ctx: &Ctx,
+    client: &Client,
+    arg: &str,
+    credential: Option<&str>,
+) -> Result<SecretString> {
+    match credential {
+        // The cluster's own request first; its 404 can only mean no such cluster.
+        None => {
+            ctx.abortable(async {
+                Ok(on_cluster(client, arg, |id| async move {
+                    connection_url(client, &id, None).await
+                })
+                .await?)
+            })
+            .await
+        }
+        // A 404 here could be the credential's, so the cluster is found first.
+        Some(credential) => {
+            let cluster = resolve(ctx, client, arg).await?.value;
+            ctx.abortable(async {
+                Ok(connection_url(client, &cluster.id, Some(credential)).await?)
+            })
+            .await
+        }
+    }
 }
 
 /// `url`, or `NAME=url` with `--env NAME`.

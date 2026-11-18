@@ -21,12 +21,22 @@ pub struct Env {
 
 impl Env {
     pub async fn start() -> Self {
+        Self::start_with(false).await
+    }
+
+    /// A mock that also answers its clusters' own API, for `cluster request`.
+    pub async fn start_local() -> Self {
+        Self::start_with(true).await
+    }
+
+    async fn start_with(local_clusters: bool) -> Self {
         let db = tempfile::tempdir().unwrap();
         let opts = MockOptions {
             db_path: db.path().join("mock.sqlite"),
             step_ms: 0,
             public_url: None,
             checkout_url: None,
+            local_clusters,
         };
         let mock = bonsai_mock::spawn(opts, "127.0.0.1:0".parse().unwrap())
             .await

@@ -15,6 +15,7 @@ use bonsai_api::{
 use jiff::Timestamp;
 use rusqlite::{Connection, OptionalExtension, Row, params};
 use serde_json::Value;
+use url::Url;
 
 use crate::engine::{self, ActionRow, NewCredential};
 use crate::http::{
@@ -160,15 +161,28 @@ impl CredentialRow {
         }
     }
 
-    /// With its secret and a complete `https://user:pass@host` URL.
-    pub fn with_secret(&self, conn: &Connection) -> rusqlite::Result<CredentialWithSecret> {
-        let host = engine::cluster_host(conn, &self.cluster_id)?;
+    /// With its secret and a complete URL: `https://user:pass@host`, or, when the
+    /// mock serves its clusters itself, `local` with the same username and password.
+    pub fn with_secret(
+        &self,
+        conn: &Connection,
+        local: Option<&Url>,
+    ) -> rusqlite::Result<CredentialWithSecret> {
+        let url = match local {
+            Some(origin) => crate::es::credential_url(origin, &self.username, &self.password),
+            None => format!(
+                "https://{}:{}@{}",
+                self.username,
+                self.password,
+                engine::cluster_host(conn, &self.cluster_id)?
+            ),
+        };
         let default_id = Self::default_id(conn, &self.cluster_id)?;
         Ok(CredentialWithSecret {
             credential: self.to_api(default_id.as_deref()),
             username: self.username.clone(),
             password: self.password.clone(),
-            url: format!("https://{}:{}@{host}", self.username, self.password),
+            url,
         })
     }
 }
@@ -211,7 +225,7 @@ async fn show(
     let cred = state.db(|c| -> Result<CredentialWithSecret, ProblemBuilder> {
         let cluster = ClusterRow::find_current(c, &auth, &cluster_id, state.step_ms())?;
         let row = CredentialRow::find_active(c, &cluster, &id)?.ok_or_else(not_found)?;
-        Ok(row.with_secret(c)?)
+        Ok(row.with_secret(c, state.cluster_origin())?)
     })?;
     let mut resp = Json(cred).into_response();
     no_store(&mut resp);
@@ -248,7 +262,7 @@ async fn create(
         };
         let start = |c: &Connection| create_credential(c, &auth, &cluster, &body);
         let made = http::idempotently(c, key.as_ref(), StatusCode::CREATED, replay, start)?;
-        let secret = made.value.with_secret(c)?;
+        let secret = made.value.with_secret(c, state.cluster_origin())?;
         Ok((made, secret))
     })?;
 

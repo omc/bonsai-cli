@@ -461,6 +461,7 @@ async fn spawn_refuses_a_non_loopback_address() {
         step_ms: 0,
         public_url: None,
         checkout_url: None,
+        local_clusters: false,
     };
     let err = bonsai_mock::spawn(opts, "0.0.0.0:0".parse().unwrap())
         .await

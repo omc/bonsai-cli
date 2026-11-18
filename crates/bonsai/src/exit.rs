@@ -1,6 +1,6 @@
 //! Exit codes.
 
-use bonsai_api::{ActionErrorCode, ApiError, ProblemCode};
+use bonsai_api::{ActionErrorCode, ApiError, EngineError, ProblemCode};
 use bonsai_core::{Cleanup, CleanupOutcome, ConfigError, CoreError, StopReason};
 
 /// No token anywhere: not in `BONSAI_TOKEN`, the keychain or `credentials.toml`.
@@ -75,18 +75,51 @@ impl std::fmt::Display for TimedOut {
 
 impl std::error::Error for TimedOut {}
 
+/// A cluster answered `bonsai cluster request` with a status of 400 or above. Its
+/// body has already gone to stdout; this is the line on stderr, and the exit code:
+/// 3 for a 401 or 403, 4 for a 404, 1 for anything else.
+#[derive(Debug)]
+pub struct EngineStatus {
+    pub status: u16,
+    /// What the body says went wrong, when it says so in one line.
+    pub reason: Option<String>,
+}
+
+/// `404 Not Found`, or the bare number for a status with no standard phrase.
+pub fn status_text(status: u16) -> String {
+    let phrase = reqwest::StatusCode::from_u16(status)
+        .ok()
+        .and_then(|s| s.canonical_reason());
+    match phrase {
+        Some(phrase) => format!("{status} {phrase}"),
+        None => status.to_string(),
+    }
+}
+
+impl std::fmt::Display for EngineStatus {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "the cluster answered {}", status_text(self.status))?;
+        if let Some(reason) = &self.reason {
+            write!(f, ": {reason}")?;
+        }
+        Ok(())
+    }
+}
+
+impl std::error::Error for EngineStatus {}
+
 /// The exit code for `e`, from the first error in its chain that has one.
 ///
 /// | Code | For |
 /// |---|---|
-/// | 2 | usage: [`CoreError::Usage`], `Ambiguous`, clap, `invalid_parameter`, the config (1) |
-/// | 3 | `401`, `403`, [`NotLoggedIn`], a stored token pointed at another host |
-/// | 4 | `404`, `ClusterNotFound` |
+/// | 2 | usage: [`CoreError::Usage`], `Ambiguous`, clap, `invalid_parameter`, the config (1), a request path that doesn't start with / |
+/// | 3 | `401`, `403`, [`NotLoggedIn`], a stored token pointed at another host, a cluster's 401 or 403 ([`EngineStatus`]) |
+/// | 4 | `404`, `ClusterNotFound`, a cluster's 404 |
 /// | 5 | an Action that failed with `timed_out`, `action_failed` or an unknown code; [`Failed`] |
 /// | 6 | `payment_method_required`, `payment_failed` |
 /// | 7 | `action_in_progress`, `idempotency_key_in_use` |
 /// | 8 | a refusal (2) |
-/// | 9 | `Timeout`, [`TimedOut`], an `ActionFailed` whose cleanup is `Unchecked` by the deadline |
+/// | 9 | `Timeout`, [`TimedOut`], an `ActionFailed` whose cleanup is `Unchecked` by the deadline, a cluster that didn't answer in time |
 /// | 130 | [`Interrupted`], `Cancelled`, `LoginCancelled`, `Unchecked` by Ctrl-C |
 /// | 1 | anything else: `metrics_unavailable`, `5xx`, transport |
 ///
@@ -108,6 +141,20 @@ fn code_of(e: &(dyn std::error::Error + 'static)) -> Option<u8> {
     }
     if let Some(e) = e.downcast_ref::<ConfigError>() {
         return Some(config_code(e));
+    }
+    if let Some(e) = e.downcast_ref::<EngineStatus>() {
+        return Some(match e.status {
+            401 | 403 => 3,
+            404 => 4,
+            _ => 1,
+        });
+    }
+    if let Some(e) = e.downcast_ref::<EngineError>() {
+        return Some(match e {
+            EngineError::InvalidPath(_) => 2,
+            EngineError::Timeout => 9,
+            _ => 1,
+        });
     }
     if e.is::<clap::Error>() {
         return Some(2);
@@ -407,5 +454,72 @@ mod tests {
             unreachable!()
         };
         assert_eq!(problem.code, ProblemCode::ActionInProgress);
+    }
+
+    #[test]
+    fn a_clusters_status_decides_the_code() {
+        let code = |status| {
+            exit_code(&anyhow::Error::new(EngineStatus {
+                status,
+                reason: None,
+            }))
+        };
+        assert_eq!(code(401), 3);
+        assert_eq!(code(403), 3);
+        assert_eq!(code(404), 4);
+        for other in [400, 409, 413, 429, 500, 501, 503] {
+            assert_eq!(code(other), 1, "{other}");
+        }
+        // A hint doesn't change it.
+        let hinted = anyhow::Error::new(EngineStatus {
+            status: 401,
+            reason: None,
+        })
+        .context(Hint(vec!["x".into()]));
+        assert_eq!(exit_code(&hinted), 3);
+    }
+
+    #[test]
+    fn a_clusters_status_reads_as_one_line() {
+        let e = EngineStatus {
+            status: 404,
+            reason: Some("no such index [products]".into()),
+        };
+        assert_eq!(
+            e.to_string(),
+            "the cluster answered 404 Not Found: no such index [products]"
+        );
+        let bare = EngineStatus {
+            status: 599,
+            reason: None,
+        };
+        assert_eq!(bare.to_string(), "the cluster answered 599");
+    }
+
+    #[test]
+    fn a_status_reads_with_its_phrase() {
+        assert_eq!(status_text(200), "200 OK");
+        assert_eq!(status_text(204), "204 No Content");
+        assert_eq!(status_text(299), "299");
+    }
+
+    #[test]
+    fn engine_errors_have_codes() {
+        let code = |e: EngineError| exit_code(&anyhow::Error::new(e));
+        assert_eq!(code(EngineError::InvalidPath("x".into())), 2);
+        assert_eq!(code(EngineError::Timeout), 9);
+        assert_eq!(code(EngineError::TooLarge { max: 1 }), 1);
+        assert_eq!(code(EngineError::InsecureUrl), 1);
+        // Not `exit::Interrupted` (Ctrl-C, 130): a connection that broke.
+        let cause = || {
+            bonsai_api::http_client()
+                .build()
+                .unwrap()
+                .get("not a url")
+                .build()
+                .unwrap_err()
+        };
+        assert_eq!(code(EngineError::Unreachable(cause())), 1);
+        assert_eq!(code(EngineError::Interrupted(cause())), 1);
     }
 }

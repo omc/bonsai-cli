@@ -433,6 +433,7 @@ async fn wait_timeout_exits_9_with_the_resume_hint() {
         step_ms: 60_000,
         public_url: None,
         checkout_url: None,
+        local_clusters: false,
     };
     let mock = bonsai_mock::spawn(opts, "127.0.0.1:0".parse().unwrap())
         .await

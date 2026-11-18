@@ -119,6 +119,7 @@ The [quickstart](https://bonsai.io/docs/cli/quickstart/) walks through the same 
 | Account | `login`, `logout`, `whoami`, `doctor`, `version` |
 | Clusters | `cluster list`, `cluster create`, `cluster show`, `cluster open`, `cluster rename`, `cluster resize`, `cluster destroy`, `cluster wait`, `cluster history` |
 | Connecting | `cluster url` |
+| Data | `cluster request` |
 | Watching | `cluster usage`, `cluster metrics`, `cluster queries` |
 | Actions | `action show`, `wait` |
 | Catalogue | `plans`, `regions`, `spaces`, `releases` |
@@ -140,6 +141,18 @@ bonsai api POST /clusters/<cluster-id>/credentials -d '{"name": "reader", "acces
 
 It prints the API's response as it is, so it can print passwords. Paths take cluster IDs, not names.
 
+`bonsai cluster request` sends a request to the cluster's own API, Elasticsearch's or OpenSearch's, with the cluster's credential. It's how you create indices, load documents and search without handling the password:
+
+```sh
+bonsai cluster request search PUT /products -d @mapping.json
+bonsai cluster request search POST /products/_bulk -d @products.ndjson
+bonsai cluster request search POST /products/_search -d '{"query": {"match": {"name": "fern"}}}'
+bonsai cluster request search GET '/_cat/indices?v'
+bonsai cluster request search DELETE /products --confirm products
+```
+
+It prints the cluster's answer as it came. When the cluster answers with an error, the exit code is 3 for a 401 or 403, 4 for a 404, and 1 otherwise. Deleting an index, or running `_delete_by_query`, asks you to type the index's name; without a terminal it needs `--confirm`.
+
 ## Scripting and CI
 
 Every command takes `--json`, which prints the API's JSON for scripts and `jq`. Messages and progress go to stderr and data goes to stdout, so `$(bonsai cluster url search)` captures only the URL.
@@ -159,7 +172,7 @@ Exit codes say what went wrong: 3 for a missing token or scope, 4 for not found,
 
 A coding agent can manage clusters with the same binary, in two ways. You can use both.
 
-`bonsai skill install` writes a [Claude Code skill](https://docs.claude.com/en/docs/claude-code/skills) to `~/.claude/skills/bonsai/SKILL.md`. It tells the agent to use `--json --no-input`, which commands to run, what the exit codes mean, and to confirm before changes that cost money. For other agents, `bonsai skill print` prints the same text, e.g. to add to `AGENTS.md`.
+`bonsai skill install` writes a [Claude Code skill](https://docs.claude.com/en/docs/claude-code/skills) to `~/.claude/skills/bonsai/SKILL.md`. It tells the agent to use `--json --no-input`, which commands to run, what the exit codes mean, and to confirm before changes that cost money. For other agents, `bonsai skill print` prints the same text, e.g. to add to `AGENTS.md`. It also teaches `bonsai cluster request`, so an agent can create indices, load documents and search without seeing the cluster's password.
 
 `bonsai mcp` is an [MCP](https://modelcontextprotocol.io) server on stdin and stdout, for clients that call tools instead of running a shell. To add it to Claude Code, run this in your project folder:
 
@@ -242,6 +255,7 @@ cargo run -p bonsai-mock -- --db /tmp/bonsai-mock.sqlite scenario clear
 Other flags:
 - `--step-ms` sets how long each Action step takes (default 1500).
 - `--reset` starts from a fresh database.
+- `--local-clusters` makes the mock answer a small part of each cluster's own API too (indices, documents, `_bulk`, `_search`), and points credential URLs at it, so `bonsai cluster request` works. Without it, a cluster's URL names a host that doesn't exist.
 - `--public-url` sets the origin the mock puts in links and `Location` headers, and accepts its host as a `Host`; use it behind a TLS proxy.
 - `--checkout-url` makes payment `action_url`s that prefix plus a fake Stripe session ID, instead of the mock's own checkout page.
 - `bonsai-mock token create --account acme --scopes "…"` makes more tokens.

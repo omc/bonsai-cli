@@ -8,6 +8,7 @@ mod clusters;
 mod common;
 mod coverage;
 mod credentials;
+mod local_clusters;
 mod login;
 mod observability;
 mod public_url;
