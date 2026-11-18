@@ -184,7 +184,8 @@ fn password_of(env: &Env, cluster_id: &str) -> String {
     password
 }
 
-const READ_TOOLS: [&str; 14] = [
+const READ_TOOLS: [&str; 15] = [
+    "cluster_request",
     "get_action",
     "get_cluster",
     "get_cluster_metrics",
@@ -224,6 +225,8 @@ async fn lists_every_tool_with_its_hints() {
     assert_eq!(hints("destroy_cluster")["readOnlyHint"], false);
     assert_eq!(hints("destroy_cluster")["destructiveHint"], true);
     assert_eq!(hints("create_cluster")["destructiveHint"], false);
+    assert_eq!(hints("cluster_request")["readOnlyHint"], false);
+    assert_eq!(hints("cluster_request")["destructiveHint"], true);
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
@@ -447,4 +450,189 @@ async fn closing_stdin_stops_it_quietly() {
     assert_eq!(status.code(), Some(0));
     let err = mcp.stderr();
     assert!(err.is_empty(), "{err:?}");
+}
+
+/// Two documents for `_bulk`, without the final newline the endpoint needs.
+const TWO: &str = concat!(
+    "{\"index\":{\"_id\":\"1\"}}\n{\"name\":\"Boston fern\"}\n",
+    "{\"index\":{\"_id\":\"2\"}}\n{\"name\":\"Jade plant\"}",
+);
+
+/// `cluster_request` with these arguments on the cluster named `data`.
+fn requested(mcp: &mut Mcp, args: Value) -> (bool, String) {
+    let mut args = args;
+    args["cluster"] = json!("data");
+    mcp.call("cluster_request", args)
+}
+
+/// The same, as the tool's JSON; panics on a tool error.
+fn answered(mcp: &mut Mcp, args: Value) -> Value {
+    let (err, text) = requested(mcp, args);
+    assert!(!err, "cluster_request failed: {text}");
+    serde_json::from_str(&text).unwrap_or_else(|e| panic!("not JSON ({e}): {text}"))
+}
+
+fn load_plants(mcp: &mut Mcp) {
+    let made = answered(mcp, json!({ "method": "put", "path": "/plants" }));
+    assert_eq!(made["status"], 200, "{made}");
+    assert_eq!(made["body"]["acknowledged"], true, "{made}");
+    let loaded = answered(
+        mcp,
+        json!({ "method": "POST", "path": "/plants/_bulk?refresh=true", "body": TWO }),
+    );
+    assert_eq!(loaded["body"]["errors"], false, "{loaded}");
+}
+
+fn count(mcp: &mut Mcp) -> Value {
+    answered(mcp, json!({ "method": "GET", "path": "/plants/_count" }))["body"]["count"].clone()
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn cluster_request_loads_and_searches_without_showing_the_password() {
+    let env = Env::start_local().await;
+    let dir = project();
+    let id = create_cluster(&env, "data");
+    let password = password_of(&env, &id);
+    let mut mcp = Mcp::start(&env, dir.path(), &[]);
+
+    load_plants(&mut mcp);
+    let query = json!({ "query": { "match": { "name": "fern" } } }).to_string();
+    let (err, found) = requested(
+        &mut mcp,
+        json!({ "method": "POST", "path": "/plants/_search", "body": query }),
+    );
+    assert!(!err, "{found}");
+    assert!(!found.contains(&password), "the password is in the answer");
+    let found: Value = serde_json::from_str(&found).unwrap();
+    assert_eq!(found["status"], 200);
+    assert_eq!(found["body"]["hits"]["total"]["value"], 1, "{found}");
+    assert_eq!(
+        found["body"]["hits"]["hits"][0]["_source"]["name"],
+        "Boston fern"
+    );
+
+    // An error from the cluster is a tool error that says what the cluster said.
+    let (err, text) = requested(&mut mcp, json!({ "method": "GET", "path": "/nope/_count" }));
+    assert!(err, "{text}");
+    assert!(
+        text.contains("the cluster answered 404 Not Found: no such index [nope]"),
+        "{text}"
+    );
+    assert!(!text.contains(&password), "the password is in the error");
+
+    // What never reaches the cluster: a method that isn't one, a path that isn't one.
+    for bad in [
+        json!({ "method": "TRACE", "path": "/plants" }),
+        json!({ "method": "GET", "path": "plants" }),
+        json!({ "method": "not a method", "path": "/plants" }),
+    ] {
+        let (err, text) = requested(&mut mcp, bad.clone());
+        assert!(err, "{bad}: {text}");
+    }
+    assert!(mcp.stderr().iter().all(|l| !l.contains(&password)));
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn cluster_request_needs_the_index_typed_back_to_delete_it() {
+    let env = Env::start_local().await;
+    let dir = project();
+    create_cluster(&env, "data");
+    let mut mcp = Mcp::start(&env, dir.path(), &[]);
+    load_plants(&mut mcp);
+
+    for (what, args) in [
+        (
+            "no confirm",
+            json!({ "method": "DELETE", "path": "/plants" }),
+        ),
+        (
+            "a wrong confirm",
+            json!({ "method": "DELETE", "path": "/plants", "confirm": "plant" }),
+        ),
+        (
+            "delete by query",
+            json!({ "method": "POST", "path": "/plants/_delete_by_query", "body": "{}" }),
+        ),
+        (
+            "two readings of the path",
+            json!({ "method": "DELETE", "path": "/plants%2F", "confirm": "plants" }),
+        ),
+    ] {
+        let (err, text) = requested(&mut mcp, args);
+        assert!(err, "{what}: {text}");
+        assert!(text.contains("nothing was sent"), "{what}: {text}");
+        assert_eq!(count(&mut mcp), 2, "{what}");
+    }
+
+    // One document isn't the whole index: no confirmation.
+    let one = answered(
+        &mut mcp,
+        json!({ "method": "DELETE", "path": "/plants/_doc/2?refresh=true" }),
+    );
+    assert_eq!(one["status"], 200, "{one}");
+
+    let gone = answered(
+        &mut mcp,
+        json!({ "method": "DELETE", "path": "/plants", "confirm": "plants" }),
+    );
+    assert_eq!(gone["body"]["acknowledged"], true, "{gone}");
+    let (err, text) = requested(
+        &mut mcp,
+        json!({ "method": "GET", "path": "/plants/_count" }),
+    );
+    assert!(err && text.contains("404"), "{text}");
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn read_only_cluster_request_only_reads() {
+    let env = Env::start_local().await;
+    let dir = project();
+    create_cluster(&env, "data");
+    {
+        let mut mcp = Mcp::start(&env, dir.path(), &[]);
+        load_plants(&mut mcp);
+    }
+    let mut mcp = Mcp::start(&env, dir.path(), &["--read-only"]);
+    assert_eq!(count(&mut mcp), 2);
+    let query = json!({ "query": { "match_all": {} } }).to_string();
+    let found = answered(
+        &mut mcp,
+        json!({ "method": "GET", "path": "/plants/_search", "body": query }),
+    );
+    assert_eq!(found["body"]["hits"]["total"]["value"], 2, "{found}");
+
+    for args in [
+        json!({ "method": "POST", "path": "/plants/_doc", "body": "{\"name\":\"Ivy\"}" }),
+        json!({ "method": "PUT", "path": "/more" }),
+        json!({ "method": "DELETE", "path": "/plants", "confirm": "plants" }),
+        json!({ "method": "GET", "path": "/plants/_delete_by_query", "confirm": "plants" }),
+    ] {
+        let (err, text) = requested(&mut mcp, args.clone());
+        assert!(err, "{args}: {text}");
+        assert!(text.contains("--read-only"), "{args}: {text}");
+    }
+    assert_eq!(count(&mut mcp), 2);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn cluster_request_refuses_an_answer_too_large_for_a_tool_result() {
+    let env = Env::start_local().await;
+    let dir = project();
+    create_cluster(&env, "data");
+    let mut mcp = Mcp::start(&env, dir.path(), &[]);
+    answered(&mut mcp, json!({ "method": "PUT", "path": "/plants" }));
+    // One document just over the cap, read back whole.
+    let big = json!({ "name": "x".repeat(300 * 1024) }).to_string();
+    let put = answered(
+        &mut mcp,
+        json!({ "method": "PUT", "path": "/plants/_doc/1?refresh=true", "body": big }),
+    );
+    assert!(put["status"] == 200 || put["status"] == 201, "{put}");
+    let (err, text) = requested(
+        &mut mcp,
+        json!({ "method": "GET", "path": "/plants/_doc/1" }),
+    );
+    assert!(err, "the answer came back whole");
+    assert!(text.contains("larger than"), "{text}");
+    assert!(text.contains("_source"), "{text}");
 }
