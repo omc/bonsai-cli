@@ -294,7 +294,7 @@ mod tests {
     #[test]
     fn a_server_lists_every_tool_it_can_have() {
         let all = tools(false, true, None);
-        assert_eq!(all.len(), 19, "{:?}", names(&all));
+        assert_eq!(all.len(), 20, "{:?}", names(&all));
         for tool in CHANGING_TOOLS
             .iter()
             .chain([&WRITE_URL_TOOL, &"cluster_request"])
@@ -306,11 +306,12 @@ mod tests {
     #[test]
     fn a_read_only_server_leaves_out_the_tools_that_change_a_cluster() {
         let read_only = tools(true, true, None);
-        assert_eq!(read_only.len(), 15);
+        assert_eq!(read_only.len(), 16);
         for tool in CHANGING_TOOLS {
             assert!(!names(&read_only).contains(&tool), "{tool}");
         }
-        // Reading a cluster's data and writing a local file stay.
+        // Reading a cluster's data, writing a local file and asking support stay.
+        assert!(names(&read_only).contains(&"create_support_request"));
         assert!(names(&read_only).contains(&"cluster_request"));
         assert!(names(&read_only).contains(&WRITE_URL_TOOL));
         assert!(description(&read_only, "cluster_request").contains("read-only"));
@@ -319,7 +320,7 @@ mod tests {
     #[test]
     fn a_server_without_a_project_has_no_tool_that_writes_a_file() {
         let hosted = tools(false, false, None);
-        assert_eq!(hosted.len(), 18);
+        assert_eq!(hosted.len(), 19);
         assert!(!names(&hosted).contains(&WRITE_URL_TOOL));
     }
 

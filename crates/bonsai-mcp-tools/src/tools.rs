@@ -5,8 +5,8 @@ use std::time::{Duration, Instant};
 
 use anyhow::Result;
 use bonsai_api::{
-    ApiError, Client, ClusterCreate, ClusterQuery, ClusterUpdate, Page, ProblemCode, Response,
-    collect_pages,
+    ApiError, Client, ClusterCreate, ClusterQuery, ClusterUpdate, Page, Problem, ProblemCode,
+    Response, SupportRequestCreate, collect_pages,
 };
 use bonsai_core::{
     CleanupPolicy, CoreError, CreateRequest, WaitOptions, create_cluster, destroy_cluster,
@@ -110,6 +110,26 @@ struct UrlParams {
     variable: Option<String>,
     /// A credential's ID (default: the cluster's default read-write credential)
     credential: Option<String>,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+struct SupportParams {
+    /// One line that says what this is about
+    subject: String,
+    /// What the user wants to tell or ask support, in their words or as they
+    /// approved it. At most 10,000 characters.
+    message: String,
+    /// What it is about: cluster_availability, search_advice, billing, compliance
+    /// or sales
+    category: String,
+    /// question (the default), problem or feature_request
+    kind: Option<String>,
+    /// The cluster this is about, by ID or name, when it is about one
+    cluster: Option<String>,
+    /// What you add on your own, for support: what you were doing, the tool you
+    /// called and the error it answered. Support sees it apart from the user's
+    /// message. At most 5,000 characters.
+    context: Option<String>,
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
@@ -498,6 +518,50 @@ impl<H: Host> Tools<H> {
         )
     }
 
+    /// Changes nothing of the account's, so a read-only server keeps it.
+    #[tool(
+        description = "Send a request to the Bonsai support team for the user: a question, a \
+                       problem, or a feature request (kind). Support answers the user by \
+                       email; nothing can be read back here. Before you call this, show the \
+                       user the subject and the message and get their yes. message is what \
+                       the user wants to say; what you add on your own goes in context. Never \
+                       put a password, a token or a connection URL in either. Not for an \
+                       outage: tell the user to write to support@bonsai.io. A connection may \
+                       send 5 an hour.",
+        annotations(
+            read_only_hint = false,
+            destructive_hint = false,
+            idempotent_hint = false,
+            open_world_hint = true
+        )
+    )]
+    async fn create_support_request(
+        &self,
+        extensions: Extensions,
+        Parameters(p): Parameters<SupportParams>,
+    ) -> Result<CallToolResult, ErrorData> {
+        self.reply(
+            async {
+                let client = self.host.client(&extensions)?;
+                // The API takes an ID; a name is resolved here, as for every tool.
+                let cluster = match p.cluster {
+                    Some(cluster) => Some(resolve_cluster(&client, &cluster).await?.value.id),
+                    None => None,
+                };
+                let body = SupportRequestCreate {
+                    subject: p.subject,
+                    message: p.message,
+                    category: p.category,
+                    kind: p.kind,
+                    cluster,
+                    context: p.context,
+                };
+                Ok(client.create_support_request(&body).await?.raw)
+            }
+            .await,
+        )
+    }
+
     /// Changes only a git-ignored file in the caller's project, never Bonsai, so
     /// a read-only server keeps it. Listed only where there is a project.
     #[tool(
@@ -701,8 +765,31 @@ fn explain<H: Host>(error: &anyhow::Error, host: &H) -> Option<String> {
             };
             Some(format!("metrics are unavailable right now, {when}"))
         }
-        _ => None,
+        _ => match api {
+            ApiError::Problem { problem, .. } => Some(told(problem)),
+            _ => None,
+        },
     }
+}
+
+/// A refusal in the API's own words: what it says went wrong, then each field at
+/// fault, then where to go to put it right. The error's own text is only the
+/// status and the code, which tells a model nothing it can act on.
+fn told(problem: &Problem) -> String {
+    let mut lines = vec![format!("{} ({})", problem.detail, problem.code)];
+    for detail in &problem.details {
+        if detail.message == problem.detail {
+            continue;
+        }
+        lines.push(match &detail.field {
+            Some(field) => format!("- {field}: {}", detail.message),
+            None => format!("- {}", detail.message),
+        });
+    }
+    if let Some(url) = &problem.action_url {
+        lines.push(format!("See {url}"));
+    }
+    lines.join("\n")
 }
 
 /// Every page of a list, as the API's items.
@@ -775,6 +862,32 @@ mod tests {
             request_budget: Some(secs(23)),
             body_max: Some(1 << 20),
         }
+    }
+
+    #[test]
+    fn a_refusal_is_told_in_the_apis_words_with_each_field_at_fault() {
+        let problem: Problem = serde_json::from_value(serde_json::json!({
+            "type": "https://bonsai.io/docs/api/errors/validation_failed",
+            "title": "Unprocessable Entity",
+            "status": 422,
+            "code": "validation_failed",
+            "detail": "The request was refused. See details.",
+            "action_url": "https://app.bonsai.io/billing",
+            "details": [
+                {"field": "/category", "message": "category must be one of: billing, sales."},
+                {"field": null, "message": "The cluster is busy."},
+                {"field": null, "message": "The request was refused. See details."},
+            ],
+        }))
+        .unwrap();
+
+        assert_eq!(
+            told(&problem),
+            "The request was refused. See details. (validation_failed)\n\
+             - /category: category must be one of: billing, sales.\n\
+             - The cluster is busy.\n\
+             See https://app.bonsai.io/billing"
+        );
     }
 
     #[test]

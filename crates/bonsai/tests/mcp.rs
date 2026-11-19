@@ -184,8 +184,9 @@ fn password_of(env: &Env, cluster_id: &str) -> String {
     password
 }
 
-const READ_TOOLS: [&str; 15] = [
+const READ_TOOLS: [&str; 16] = [
     "cluster_request",
+    "create_support_request",
     "get_action",
     "get_cluster",
     "get_cluster_metrics",
@@ -227,6 +228,59 @@ async fn lists_every_tool_with_its_hints() {
     assert_eq!(hints("create_cluster")["destructiveHint"], false);
     assert_eq!(hints("cluster_request")["readOnlyHint"], false);
     assert_eq!(hints("cluster_request")["destructiveHint"], true);
+    // A support request reaches people outside the account, and changes nothing in it.
+    assert_eq!(hints("create_support_request")["readOnlyHint"], false);
+    assert_eq!(hints("create_support_request")["destructiveHint"], false);
+    assert_eq!(hints("create_support_request")["openWorldHint"], true);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn files_a_support_request_about_a_cluster_named_by_its_name() {
+    let env = Env::start().await;
+    let dir = project();
+    create_cluster(&env, "shop");
+    // Read-only too: a request changes nothing of the account's.
+    let mut mcp = Mcp::start(&env, dir.path(), &["--read-only"]);
+
+    let sent = mcp.call_json(
+        "create_support_request",
+        json!({
+            "subject": "Synonym sets per index",
+            "message": "We'd like to keep a synonym set for each index.",
+            "category": "search_advice",
+            "kind": "feature_request",
+            "cluster": "shop",
+            "context": "The user asked while tuning search on shop.",
+        }),
+    );
+
+    assert!(sent["id"].as_str().unwrap().starts_with("th_"), "{sent}");
+    assert_eq!(sent["subject"], "Synonym sets per index");
+    assert_eq!(sent["kind"], "feature_request");
+    assert!(sent.get("message").is_none(), "{sent}");
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn a_support_request_the_api_refuses_is_a_tool_error_that_says_why() {
+    let env = Env::start().await;
+    let dir = project();
+    let mut mcp = Mcp::start(&env, dir.path(), &[]);
+    let request = |category: &str, cluster: Option<&str>| {
+        let mut args = json!({"subject": "S", "message": "M", "category": category});
+        if let Some(cluster) = cluster {
+            args["cluster"] = json!(cluster);
+        }
+        args
+    };
+
+    let (err, text) = mcp.call("create_support_request", request("weather", None));
+    assert!(err, "{text}");
+    assert!(text.contains("category must be one of"), "{text}");
+
+    // A cluster nobody has is refused before anything is sent.
+    let (err, text) = mcp.call("create_support_request", request("billing", Some("nope")));
+    assert!(err, "{text}");
+    assert!(text.contains("nope"), "{text}");
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
