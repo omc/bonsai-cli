@@ -19,6 +19,7 @@ path = "src/main.rs"
 [dependencies]
 bonsai-api = { path = "../bonsai-api" }
 bonsai-core = { path = "../bonsai-core" }
+bonsai-mcp-tools = { path = "../bonsai-mcp-tools" }
 anyhow.workspace = true
 clap.workspace = true
 clap_complete.workspace = true
@@ -44,7 +45,6 @@ reqwest.workspace = true
 url.workspace = true
 semver.workspace = true
 rmcp.workspace = true
-schemars.workspace = true
 
 [dev-dependencies]
 bonsai-contract = { path = "../bonsai-contract" }

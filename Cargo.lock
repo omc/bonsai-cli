@@ -436,6 +436,7 @@ dependencies = [
  "bonsai-api",
  "bonsai-contract",
  "bonsai-core",
+ "bonsai-mcp-tools",
  "bonsai-mock",
  "clap",
  "clap_complete",
@@ -451,7 +452,6 @@ dependencies = [
  "predicates",
  "reqwest",
  "rmcp",
- "schemars",
  "secrecy",
  "semver",
  "serde",
@@ -526,6 +526,23 @@ dependencies = [
  "url",
  "wiremock",
  "zbus-secret-service-keyring-store",
+]
+
+[[package]]
+name = "bonsai-mcp-tools"
+version = "0.6.0"
+dependencies = [
+ "anyhow",
+ "bonsai-api",
+ "bonsai-core",
+ "http",
+ "jiff",
+ "rmcp",
+ "schemars",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tokio-util",
 ]
 
 [[package]]
