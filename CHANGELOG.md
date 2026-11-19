@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.6.1] - 2026-11-19
+
 ### Changed
 
 - The MCP tools live in one crate, `bonsai-mcp-tools`, which `bonsai mcp` and the hosted MCP server both build on, so the two no longer carry a copy each. For `bonsai mcp` the tools, their arguments and their answers are the same. Their descriptions now state the server's limits, such as how long `wait_action` waits, and name the scope a tool needs.
@@ -109,7 +111,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 - First pre-release: browser and token login, `whoami`, `doctor`, creating, showing, renaming, resizing and destroying clusters, connection URLs, usage, metrics, top search terms, Actions, the plan, region, space and release catalogue, `bonsai api`, shell completions and the Claude Code skill.
 
-[Unreleased]: https://github.com/omc/bonsai-cli/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/omc/bonsai-cli/compare/v0.6.1...HEAD
+[0.6.1]: https://github.com/omc/bonsai-cli/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/omc/bonsai-cli/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/omc/bonsai-cli/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/omc/bonsai-cli/compare/v0.3.1...v0.4.0
