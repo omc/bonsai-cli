@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-11-18
+
 ### Added
 
 - `bonsai mcp` has a `cluster_request` tool: one request to the cluster's own API with the cluster's credential, as `bonsai cluster request` sends it. An agent that only calls tools can now create indices, load documents and search. It returns the status and the cluster's answer, up to 256 KiB, and never the password. `DELETE /<index>` and `_delete_by_query` need the index's name in `confirm`. With `--read-only` it sends only GET and HEAD.
@@ -103,7 +105,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 - First pre-release: browser and token login, `whoami`, `doctor`, creating, showing, renaming, resizing and destroying clusters, connection URLs, usage, metrics, top search terms, Actions, the plan, region, space and release catalogue, `bonsai api`, shell completions and the Claude Code skill.
 
-[Unreleased]: https://github.com/omc/bonsai-cli/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/omc/bonsai-cli/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/omc/bonsai-cli/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/omc/bonsai-cli/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/omc/bonsai-cli/compare/v0.3.1...v0.4.0
 [0.3.1]: https://github.com/omc/bonsai-cli/compare/v0.3.0...v0.3.1
