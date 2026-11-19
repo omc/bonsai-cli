@@ -6,6 +6,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added
+
+- `bonsai mcp` has a `create_support_request` tool: an agent can send a question, a problem or a feature request to the Bonsai support team for you. It is told to show you the subject and the message first. Support answers you by email. What the agent adds on its own, such as the error it got, is kept apart from your message. It needs no scope, a token may send 5 an hour, and `--read-only` keeps it.
+- `bonsai-mock` answers `POST /v1/support_requests`, and has a `support_unavailable` scenario.
+
+### Changed
+
+- An MCP tool error now says what the API refused and which field was at fault, where it used to give only the status and the code, such as `Unprocessable Entity (validation_failed)`.
+
 ## [0.6.1] - 2026-11-19
 
 ### Changed
