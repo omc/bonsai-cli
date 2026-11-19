@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Changed
+
+- The MCP tools live in one crate, `bonsai-mcp-tools`, which `bonsai mcp` and the hosted MCP server both build on, so the two no longer carry a copy each. For `bonsai mcp` the tools, their arguments and their answers are the same. Their descriptions now state the server's limits, such as how long `wait_action` waits, and name the scope a tool needs.
+
 ## [0.6.0] - 2026-11-18
 
 ### Added

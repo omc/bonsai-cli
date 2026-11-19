@@ -208,13 +208,14 @@ If you have a question, a problem, or something you'd like the CLI to do, write 
 
 ## Contributing
 
-The workspace has five crates:
+The workspace has six crates:
 
 | Crate | What it is |
 |---|---|
 | `crates/bonsai` | The `bonsai` binary |
 | `crates/bonsai-api` | The HTTP client and the API's types |
 | `crates/bonsai-core` | Login, config, token storage, and waiting on Actions |
+| `crates/bonsai-mcp-tools` | The MCP tools, shared by `bonsai mcp` and the hosted MCP server. A tool added here is in both |
 | `crates/bonsai-contract` | Checks responses against `openapi/v1.yml`, the API's OpenAPI description |
 | `crates/bonsai-mock` | A local mock of the Bonsai API, for development and tests |
 
