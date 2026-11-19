@@ -21,7 +21,7 @@ jobs:
       ${{ github.event.pull_request.head.repo.fork && 'ubuntu-24.04' ||
       format('runs-on={0}-fmt/cpu=2/family=c7i+m7i/image=ubuntu24-full-x64', github.run_id) }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: "1.90"
@@ -33,7 +33,7 @@ jobs:
       ${{ github.event.pull_request.head.repo.fork && 'ubuntu-24.04' ||
       format('runs-on={0}-clippy/cpu=4/family=c7i+m7i/image=ubuntu24-full-x64/extras=s3-cache', github.run_id) }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: "1.90"
@@ -61,7 +61,7 @@ jobs:
       # every link and grows the cache.
       CARGO_PROFILE_DEV_DEBUG: line-tables-only
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: "1.90"
@@ -78,7 +78,7 @@ jobs:
       ${{ github.event.pull_request.head.repo.fork && 'ubuntu-24.04' ||
       format('runs-on={0}-deny/cpu=2/family=c7i+m7i/image=ubuntu24-full-x64', github.run_id) }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: EmbarkStudios/cargo-deny-action@v2
 
   # The release builds static musl binaries (dist-workspace.toml); build them on
@@ -101,7 +101,7 @@ jobs:
       format('runs-on={0}-musl-arm/cpu=4/family=c8g.*/image=ubuntu24-full-arm64/extras=s3-cache', github.run_id) ||
       format('runs-on={0}-musl-x64/cpu=4/family=c7i+m7i/image=ubuntu24-full-x64/extras=s3-cache', github.run_id) }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: "1.90"
@@ -127,7 +127,7 @@ jobs:
     outputs:
       nix: ${{ steps.diff.outputs.nix }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
       - id: diff
@@ -155,7 +155,7 @@ jobs:
       ${{ github.event.pull_request.head.repo.fork && 'ubuntu-24.04' ||
       format('runs-on={0}-nix/cpu=8/family=c7i+m7i/image=ubuntu24-full-x64', github.run_id) }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: cachix/install-nix-action@v31
       - run: nix build -L
       - run: ./result/bin/bonsai version
