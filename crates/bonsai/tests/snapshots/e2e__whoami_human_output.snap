@@ -8,5 +8,5 @@ API                 http://127.0.0.1:PORT/v1
 Token               env (BONSAI_TOKEN)
 Token key (public)  KEY
 Token name          Seed token
-Scopes              account:read, clusters:read, clusters:write, credentials:read, credentials:write, query_logs:read
+Scopes              account:read, clusters:read, clusters:write, credentials:read, credentials:write, data:read, data:write, query_logs:read
 Expires             never

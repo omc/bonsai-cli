@@ -19,6 +19,10 @@ pub const ALL_SCOPES: &[&str] = &[
     "clusters:write",
     "credentials:read",
     "credentials:write",
+    // No /v1 endpoint needs these two: the hosted MCP server reads them from
+    // `GET /v1/token` to decide what its `cluster_request` tool may send.
+    "data:read",
+    "data:write",
     "query_logs:read",
 ];
 
