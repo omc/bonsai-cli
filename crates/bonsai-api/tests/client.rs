@@ -441,6 +441,43 @@ async fn does_not_retry_unkeyed_post_after_send() {
 }
 
 #[tokio::test]
+async fn a_support_request_is_sent_once_whatever_the_answer() {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/v1/support_requests"))
+        .respond_with(ResponseTemplate::new(503).insert_header("Retry-After", "1"))
+        .mount(&server)
+        .await;
+    let body = SupportRequestCreate {
+        subject: "Slow".into(),
+        message: "Since noon.".into(),
+        category: "search_advice".into(),
+        kind: None,
+        cluster: Some("shop-1".into()),
+        context: None,
+    };
+
+    let err = client(&server)
+        .create_support_request(&body)
+        .await
+        .unwrap_err();
+
+    // A retry could file it twice.
+    assert_eq!(err.status(), Some(503));
+    assert_eq!(request_count(&server).await, 1);
+    let sent: serde_json::Value =
+        serde_json::from_slice(&server.received_requests().await.unwrap()[0].body).unwrap();
+    // What wasn't given isn't sent, so the API's defaults apply.
+    assert_eq!(
+        sent,
+        serde_json::json!({
+            "subject": "Slow", "message": "Since noon.", "category": "search_advice",
+            "cluster": "shop-1",
+        })
+    );
+}
+
+#[tokio::test]
 async fn retries_idempotency_key_in_use_409() {
     let server = MockServer::start().await;
     Mock::given(method("POST"))

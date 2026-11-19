@@ -12,8 +12,8 @@ fn h() -> Vec<(String, String)> {
 }
 
 #[test]
-fn lists_all_26_operations() {
-    assert_eq!(c().operations().len(), 26);
+fn lists_all_27_operations() {
+    assert_eq!(c().operations().len(), 27);
     assert!(
         c().operations()
             .iter()
@@ -424,6 +424,22 @@ fn all_of_requires_the_second_branchs_fields() {
     });
     c().validate_schema("Credential", &cred).unwrap();
     assert!(c().validate_schema("CredentialWithSecret", &cred).is_err());
+}
+
+#[test]
+fn a_201_for_something_with_no_url_needs_no_location() {
+    let body = json!({"id": "th_1", "subject": "S", "category": "billing", "kind": "question"});
+    let contract = c();
+    let headers = h();
+    let sent = contract.validate_response(&ResponseCheck {
+        method: "POST",
+        path: "/support_requests",
+        status: 201,
+        content_type: Some("application/json"),
+        headers: &headers,
+        body: Some(&body),
+    });
+    assert!(sent.is_ok(), "{sent:?}");
 }
 
 #[test]

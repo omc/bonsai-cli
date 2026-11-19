@@ -372,6 +372,36 @@ pub struct Release {
     pub version: String,
 }
 
+/// `POST /support_requests`: a request to the support team. It is from the token's
+/// creator, whom support answers by email.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SupportRequestCreate {
+    pub subject: String,
+    /// What the person wants to tell or ask support.
+    pub message: String,
+    /// `cluster_availability`, `search_advice`, `billing`, `compliance` or `sales`.
+    pub category: String,
+    /// `question` (the default), `problem` or `feature_request`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub kind: Option<String>,
+    /// The ID of the cluster this is about.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cluster: Option<String>,
+    /// What an agent adds on its own. Support sees it apart from `message`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub context: Option<String>,
+}
+
+/// What was sent to support. Not the message.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SupportRequest {
+    /// The request's ID at the support desk.
+    pub id: String,
+    pub subject: String,
+    pub category: String,
+    pub kind: String,
+}
+
 /// `GET /token`: the calling token's own details.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Token {

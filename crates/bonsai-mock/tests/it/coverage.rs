@@ -367,6 +367,32 @@ async fn drive_login(m: &Mock) {
     }
 }
 
+/// A support request, on a token with no scopes (it needs none, so it has no
+/// 403): 429 and 401, a body that isn't the schema's (400), a value that isn't
+/// accepted (422), the desk not answering (503), then one that is sent (201).
+async fn drive_support(m: &Mock) {
+    let token = m.token("acme", &[]);
+    let t = Some(token.as_str());
+    let path = "/support_requests";
+    let body = json!({"subject": "Slow", "message": "Since noon.", "category": "search_advice"});
+
+    m.admin("PUT", "/scenario/rate_limit_next", Some(json!(1)))
+        .await;
+    expect(m, t, "POST", path, Some(body.clone()), 429).await;
+    m.admin("DELETE", "/rate_limits", None).await;
+    expect(m, None, "POST", path, Some(body.clone()), 401).await;
+    expect(m, t, "POST", path, Some(json!({"subject": "Slow"})), 400).await;
+    let mut wrong = body.clone();
+    wrong["category"] = json!("weather");
+    expect(m, t, "POST", path, Some(wrong), 422).await;
+    m.admin("PUT", "/scenario/support_unavailable", Some(json!(true)))
+        .await;
+    expect(m, t, "POST", path, Some(body.clone()), 503).await;
+    m.admin("DELETE", "/scenario/support_unavailable", None)
+        .await;
+    expect(m, t, "POST", path, Some(body), 201).await;
+}
+
 /// The calling token, on a token of its own with no scopes (neither operation
 /// needs one, so neither has a 403): each 429 and 401, the read (200), then the
 /// revoke (204), after which the token answers 401.
@@ -416,12 +442,13 @@ async fn every_operation_and_documented_status() {
     drive(&m).await;
     drive_login(&m).await;
     drive_token(&m).await;
+    drive_support(&m).await;
     drive_slow(&slow).await;
     let mut seen = m.seen();
     seen.extend(slow.seen());
 
     let ops = m.contract.operations();
-    assert_eq!(ops.len(), 26);
+    assert_eq!(ops.len(), 27);
 
     let gap = |id: &str, status: u16| {
         ALLOWED_GAPS

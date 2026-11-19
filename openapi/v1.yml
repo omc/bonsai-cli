@@ -44,6 +44,7 @@ tags:
       (`cluster.read_only`, `cluster.disable`, `cluster.enable`); they show up
       in the same lists.
   - { name: credentials, description: Connection credentials for a cluster. }
+  - { name: support, description: Requests to the Bonsai support team. }
   - { name: catalogue, description: "Plans, regions, spaces and releases." }
   - name: login
     description: |
@@ -125,6 +126,44 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "429": { $ref: "#/components/responses/RateLimited" }
 
+  /support_requests:
+    post:
+      operationId: createSupportRequest
+      tags: [support]
+      summary: Send a request to the support team
+      description: |
+        A question, a problem or a feature request, as the dashboard's support
+        dialog sends one. It is from the person who created the token: support
+        answers them by email. Needs no scope: any token may ask for help.
+
+        Made for AI agents acting for a person, so `message` is what the person
+        asked to say and `context` is what an agent adds on its own; support
+        sees the two apart. Never put a password, a token or a connection URL in
+        either.
+
+        A token may send 5 an hour, counting only requests that were sent on.
+        There is no way to read or list requests: the answer comes by email.
+        This is not for an outage: write to support@bonsai.io.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SupportRequestCreate" }
+      responses:
+        "201":
+          description: The request was sent.
+          headers:
+            RateLimit: { $ref: "#/components/headers/RateLimit" }
+            RateLimit-Policy: { $ref: "#/components/headers/RateLimitPolicy" }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SupportRequest" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "422": { $ref: "#/components/responses/Unprocessable" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+        "503": { $ref: "#/components/responses/SupportUnavailable" }
+
   /clusters:
     get:
       operationId: listClusters
@@ -165,7 +204,8 @@ paths:
         payment_method_required`, before any Action starts, so the same
         `Idempotency-Key` works once a card is added. The problem's `action_url`
         is a Stripe Checkout page where a person adds one, no Bonsai login needed.
-        A card added there becomes the account's default.
+        A card added there becomes the account's default within seconds, once
+        Stripe tells Bonsai; repeat the request then.
 
         Billing starts before the cluster is built, during this request. If
         Stripe refuses the charge, this is `422 payment_failed`, with the same
@@ -305,7 +345,8 @@ paths:
         payment_method_required`, before any Action starts, so the same
         `Idempotency-Key` works once a card is added. The problem's `action_url`
         is a Stripe Checkout page where a person adds one, no Bonsai login needed.
-        A card added there becomes the account's default.
+        A card added there becomes the account's default within seconds, once
+        Stripe tells Bonsai; repeat the request then.
       x-operation: update_cluster
       x-action-types: [cluster.change_plan]
       parameters:
@@ -529,8 +570,8 @@ paths:
         Synchronous: the cluster's routes are updated before this answers, so
         an `rw` or `ro` credential works as soon as it is returned. An `rwm` or
         `acl` credential's permissions are then sent to the cluster in the
-        background, and apply once that finishes. The response is the only
-        one besides `getClusterCredential` that carries the password. The
+        background, and apply once that finishes. The response carries the
+        password, as only this and `getClusterCredential` do. The
         cluster must be ready; a Hobby cluster may have one active credential.
         A replay with the same `Idempotency-Key` returns the credential again
         with `Idempotent-Replayed: true`, or `409 idempotency_replay_unavailable`
@@ -576,7 +617,7 @@ paths:
       operationId: getClusterCredential
       tags: [credentials]
       summary: Show a credential, with its secret
-      description: The only place a credential's password appears.
+      description: Carries the credential's password, as only this and `createClusterCredential` do.
       x-operation: read_cluster_credentials
       responses:
         "200":
@@ -903,6 +944,15 @@ components:
       content:
         application/problem+json:
           schema: { $ref: "#/components/schemas/Problem" }
+    SupportUnavailable:
+      description: The request couldn't be delivered to the support team (`support_unavailable`). It may or may not have arrived, so write to support@bonsai.io rather than sending it twice.
+      headers:
+        Retry-After: { $ref: "#/components/headers/RetryAfter" }
+        RateLimit: { $ref: "#/components/headers/RateLimit" }
+        RateLimit-Policy: { $ref: "#/components/headers/RateLimitPolicy" }
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
 
   schemas:
     ApiRoot:
@@ -941,6 +991,35 @@ components:
         expires_at: { type: string, format: date-time, nullable: true, description: null for a token that never expires. }
         created_at: { type: string, format: date-time }
 
+    SupportRequestCreate:
+      type: object
+      description: A field this schema doesn't list is `400 invalid_parameter`.
+      additionalProperties: false
+      required: [subject, message, category]
+      properties:
+        subject: { type: string, minLength: 1, maxLength: 200, description: One line that says what this is about. }
+        message: { type: string, minLength: 1, maxLength: 10000, description: What the person wants to tell or ask support. }
+        category:
+          type: string
+          x-extensible-enum: [cluster_availability, search_advice, billing, compliance, sales]
+          description: What the request is about, which decides who picks it up.
+        kind:
+          type: string
+          x-extensible-enum: [question, problem, feature_request]
+          description: Defaults to `question`. A `feature_request` is titled as one.
+        cluster: { type: string, description: "The ID of the cluster this is about, when it is about one. An ID that isn't an active cluster of the account is `422 validation_failed`." }
+        context: { type: string, maxLength: 5000, description: "What an agent adds on its own: what it was doing, the error it got. Shown to support apart from `message`." }
+
+    SupportRequest:
+      type: object
+      description: What was sent. Not the message.
+      required: [id, subject, category, kind]
+      properties:
+        id: { type: string, description: "The request's ID at the support desk. Quote it when you write to support about it." }
+        subject: { type: string }
+        category: { type: string }
+        kind: { type: string }
+
     Problem:
       type: object
       description: RFC 9457 problem details, extended with `code` and `details`.
@@ -974,6 +1053,7 @@ components:
             - idempotency_key_in_use
             - idempotency_replay_unavailable
             - metrics_unavailable
+            - support_unavailable
             - internal_error
             - authorization_pending
             - slow_down
@@ -985,7 +1065,7 @@ components:
           type: string
           format: uri
           nullable: true
-          description: Where a person can fix the problem, when only a person can; absent otherwise. On `payment_method_required` and `payment_failed`, a Stripe Checkout page for adding a card, valid for at least an hour; repeat the request for a current one. If Stripe can't be reached, the dashboard page where an account Admin or Billing user adds one instead.
+          description: Where a person can fix the problem, when only a person can; absent otherwise. On `payment_method_required` and `payment_failed`, a Stripe Checkout page for adding a card, valid for at least an hour; repeat the request for a current one. Only a token whose owner may manage the account's billing (an Admin or Billing user) gets a Checkout page, since adding a card through it needs no Bonsai login; any other token, and any when Stripe can't be reached, gets the dashboard page where an account Admin or Billing user adds one instead.
         details:
           type: array
           items: { $ref: "#/components/schemas/ProblemDetail" }
@@ -1142,7 +1222,7 @@ components:
             action_url:
               type: string
               format: uri
-              description: Set on `payment_failed` to a Stripe Checkout page for adding a card, valid for at least an hour after the response; fetch the Action again for a current one. Only a token with `clusters:write` gets a Checkout page, since adding a card through it needs no Bonsai login; any other token, and any when Stripe can't be reached, gets the dashboard page where an account Admin or Billing user adds one instead. Absent otherwise.
+              description: Set on `payment_failed` to a Stripe Checkout page for adding a card, valid for at least an hour after the response; fetch the Action again for a current one. Only a token whose owner may manage the account's billing (an Admin or Billing user) gets a Checkout page, since adding a card through it needs no Bonsai login; any other token, and any when Stripe can't be reached, gets the dashboard page where an account Admin or Billing user adds one instead. Absent otherwise.
         result:
           type: object
           nullable: true

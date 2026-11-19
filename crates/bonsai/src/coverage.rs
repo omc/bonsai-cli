@@ -12,6 +12,8 @@ pub const COVERAGE: &[(&str, &[&str])] = &[
     // `login` reads a pasted token's expiry.
     ("getToken", &["login", "whoami"]),
     ("revokeToken", &["logout"]),
+    // An agent files one for the person; there is no command for it.
+    ("createSupportRequest", &["mcp"]),
     // Every command that takes a CLUSTER resolves it: getCluster by ID, then
     // listClusters by name (bonsai-core's resolve_cluster).
     (

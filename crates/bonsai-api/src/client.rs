@@ -375,6 +375,17 @@ impl Client {
         none_on_404(self.get(&["token"], &[]).await)
     }
 
+    /// `POST /support_requests`: sends a request to the support team. It carries no
+    /// `Idempotency-Key`, so it is not sent again once it has left: a retry could
+    /// file it twice.
+    pub async fn create_support_request(
+        &self,
+        body: &SupportRequestCreate,
+    ) -> Result<SupportRequest> {
+        self.write(Method::POST, &["support_requests"], &[], Some(body), None)
+            .await
+    }
+
     /// `DELETE /token`: revokes the calling token. `None` when the server doesn't offer it.
     pub async fn revoke_token(&self) -> std::result::Result<Option<()>, ApiError> {
         let res = self

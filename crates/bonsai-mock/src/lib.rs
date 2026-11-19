@@ -166,6 +166,7 @@ pub fn app(state: AppState) -> Router {
         .merge(routes::credentials::router())
         .merge(routes::observability::router())
         .merge(routes::token::router())
+        .merge(routes::support::router())
         .method_not_allowed_fallback(wrong_method)
         .route_layer(from_fn_with_state(state.clone(), http::limit_by_token));
     let unlimited = routes::root::openapi_router()

@@ -80,6 +80,9 @@ struct ResponseSpec {
     codes: Vec<String>,
     /// The response declares a `Retry-After` header.
     retry_after: bool,
+    /// The response declares a `Location` header: what it made can be read at a
+    /// URL. A `201` for something with no URL, such as a support request, doesn't.
+    location: bool,
 }
 
 pub struct Contract {
@@ -201,12 +204,17 @@ impl Contract {
                         .get("headers")
                         .and_then(Value::as_object)
                         .is_some_and(|h| h.keys().any(|k| k.eq_ignore_ascii_case("retry-after")));
+                    let location = r
+                        .get("headers")
+                        .and_then(Value::as_object)
+                        .is_some_and(|h| h.keys().any(|k| k.eq_ignore_ascii_case("location")));
                     let spec = match r.get("content").and_then(Value::as_object) {
                         None => ResponseSpec {
                             content_type: None,
                             validator: None,
                             codes,
                             retry_after,
+                            location,
                         },
                         Some(content) => {
                             if content.len() != 1 {
@@ -243,6 +251,7 @@ impl Contract {
                                 validator,
                                 codes,
                                 retry_after,
+                                location,
                             }
                         }
                     };
@@ -325,7 +334,7 @@ impl Contract {
                 }
             }
         }
-        if matches!(r.status, 201 | 202) && !has_header("Location") {
+        if spec.location && !has_header("Location") {
             return Err(Violation::MissingHeader("Location".into()));
         }
 

@@ -12,3 +12,4 @@ mod local_clusters;
 mod login;
 mod observability;
 mod public_url;
+mod support;

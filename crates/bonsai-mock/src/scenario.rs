@@ -2,8 +2,8 @@
 //! the admin API and the `bonsai-mock scenario` CLI all see the same values.
 //!
 //! Known keys: `fail_next` (`"payment_failed"|"action_failed"|"timed_out"`),
-//! `metrics_unavailable` (bool), `rate_limit_next` (int), `cluster_status_next`
-//! (a status from 400 to 599).
+//! `metrics_unavailable` (bool), `support_unavailable` (bool), `rate_limit_next`
+//! (int), `cluster_status_next` (a status from 400 to 599).
 //!
 //! `fail_next` is taken once: `payment_failed` by the next `createCluster` that
 //! passes validation (a `422 payment_failed`, nothing built), the other two by
@@ -12,6 +12,9 @@
 //! `metrics_unavailable`, while `true`, makes usage, metrics and top queries
 //! answer `503 metrics_unavailable` with `Retry-After`, once their parameters
 //! have been checked. It stays set until cleared.
+//!
+//! `support_unavailable`, while `true`, makes a support request that passed its
+//! checks answer `503 support_unavailable` with `Retry-After`.
 //!
 //! `rate_limit_next = n` makes the next `n` requests to a `/v1` route answer
 //! `429 rate_limited` with `Retry-After: 1`. It fires in the rate-limit layer,
@@ -32,6 +35,7 @@ use serde_json::Value;
 pub const KEYS: &[&str] = &[
     "fail_next",
     "metrics_unavailable",
+    "support_unavailable",
     "rate_limit_next",
     "cluster_status_next",
 ];
@@ -43,7 +47,7 @@ pub const FAIL_NEXT: &[&str] = &["payment_failed", "action_failed", "timed_out"]
 pub fn validate(key: &str, value: &Value) -> Result<(), String> {
     let ok = match key {
         "fail_next" => value.as_str().is_some_and(|v| FAIL_NEXT.contains(&v)),
-        "metrics_unavailable" => value.is_boolean(),
+        "metrics_unavailable" | "support_unavailable" => value.is_boolean(),
         "rate_limit_next" => value.is_u64(),
         "cluster_status_next" => value.as_u64().is_some_and(|s| (400..=599).contains(&s)),
         _ => {
@@ -58,7 +62,7 @@ pub fn validate(key: &str, value: &Value) -> Result<(), String> {
     }
     Err(match key {
         "fail_next" => format!("fail_next must be one of {}", FAIL_NEXT.join(", ")),
-        "metrics_unavailable" => "metrics_unavailable must be true or false".into(),
+        "metrics_unavailable" | "support_unavailable" => format!("{key} must be true or false"),
         "cluster_status_next" => "cluster_status_next must be a status from 400 to 599".into(),
         _ => "rate_limit_next must be a whole number, 0 or more".into(),
     })

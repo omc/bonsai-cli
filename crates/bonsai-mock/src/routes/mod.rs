@@ -10,4 +10,5 @@ pub mod credentials;
 pub mod login;
 pub mod observability;
 pub mod root;
+pub mod support;
 pub mod token;
