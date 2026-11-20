@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-11-20
+
 ### Added
 
 - `bonsai mcp` has a `create_support_request` tool: an agent can send a question, a problem or a feature request to the Bonsai support team for you. It is told to show you the subject and the message first. Support answers you by email. What the agent adds on its own, such as the error it got, is kept apart from your message. It needs no scope, a token may send 5 an hour, and `--read-only` keeps it.
@@ -14,6 +16,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ### Changed
 
 - An MCP tool error now says what the API refused and which field was at fault, where it used to give only the status and the code, such as `Unprocessable Entity (validation_failed)`.
+- Building from source needs Rust 1.89 or newer, where 1.88 was enough.
 
 ## [0.6.1] - 2026-11-19
 
@@ -120,7 +123,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 - First pre-release: browser and token login, `whoami`, `doctor`, creating, showing, renaming, resizing and destroying clusters, connection URLs, usage, metrics, top search terms, Actions, the plan, region, space and release catalogue, `bonsai api`, shell completions and the Claude Code skill.
 
-[Unreleased]: https://github.com/omc/bonsai-cli/compare/v0.6.1...HEAD
+[Unreleased]: https://github.com/omc/bonsai-cli/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/omc/bonsai-cli/compare/v0.6.1...v0.7.0
 [0.6.1]: https://github.com/omc/bonsai-cli/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/omc/bonsai-cli/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/omc/bonsai-cli/compare/v0.4.0...v0.5.0
