@@ -55,7 +55,7 @@ With Nix:
 nix profile install github:omc/bonsai-cli
 ```
 
-From source, with Rust 1.88 or newer:
+From source, with Rust 1.89 or newer:
 
 ```sh
 git clone https://github.com/omc/bonsai-cli
