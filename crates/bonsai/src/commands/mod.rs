@@ -65,13 +65,7 @@ impl Ctx {
         token: Option<SecretString>,
         retry: RetryPolicy,
     ) -> Result<Client> {
-        Ok(Client::new(ClientConfig {
-            base_url: settings.api_url.clone(),
-            token,
-            user_agent: user_agent(),
-            retry,
-            ca_bundle: ca_bundle(),
-        })?)
+        client_as(settings, token, retry, user_agent())
     }
 
     /// The active profile's token, if there is one. The keychain (D-Bus, or an unlock
@@ -101,9 +95,15 @@ impl Ctx {
     }
 
     pub async fn authed(&self) -> Result<Authed> {
+        self.authed_with(user_agent()).await
+    }
+
+    /// [`Ctx::authed`], with the API client sending `user_agent`: `bonsai mcp` sends
+    /// [`mcp_user_agent`] so the API can tell its calls from the CLI's.
+    pub async fn authed_with(&self, user_agent: String) -> Result<Authed> {
         let settings = self.settings()?;
         let (token, source) = self.token(&settings).await?;
-        let client = self.client(&settings, Some(token))?;
+        let client = client_as(&settings, Some(token), RetryPolicy::default(), user_agent)?;
         Ok(Authed {
             settings,
             client,
@@ -148,6 +148,27 @@ pub fn user_agent() -> String {
     )
 }
 
+/// `bonsai-cli/<version> (<os>; <arch>) mcp`: what `bonsai mcp` sends, so the API
+/// logs its calls as the local MCP server's rather than the CLI's.
+pub fn mcp_user_agent() -> String {
+    format!("{} mcp", user_agent())
+}
+
+fn client_as(
+    settings: &Settings,
+    token: Option<SecretString>,
+    retry: RetryPolicy,
+    user_agent: String,
+) -> Result<Client> {
+    Ok(Client::new(ClientConfig {
+        base_url: settings.api_url.clone(),
+        token,
+        user_agent,
+        retry,
+        ca_bundle: ca_bundle(),
+    })?)
+}
+
 /// `BONSAI_CA_BUNDLE`: a PEM file of extra root certificates, trusted for the API
 /// and for clusters alike.
 pub fn ca_bundle() -> Option<PathBuf> {
@@ -190,5 +211,17 @@ pub async fn run(command: Command, ctx: &Ctx) -> Result<()> {
         Command::Regions(args) => catalogue::regions(ctx, args).await,
         Command::Spaces(args) => catalogue::spaces(ctx, args).await,
         Command::Releases(args) => catalogue::releases(ctx, args).await,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn mcp_user_agent_is_the_cli_user_agent_with_an_mcp_token() {
+        assert_eq!(mcp_user_agent(), format!("{} mcp", user_agent()));
+        assert!(mcp_user_agent().starts_with("bonsai-cli/"));
+        assert!(!user_agent().ends_with(" mcp"));
     }
 }

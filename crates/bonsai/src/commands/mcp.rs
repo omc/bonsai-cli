@@ -20,12 +20,12 @@ use rmcp::ServiceExt;
 use rmcp::model::Extensions;
 use serde_json::Value;
 
-use super::{Ctx, ca_bundle, env_file, user_agent};
+use super::{Ctx, ca_bundle, env_file, mcp_user_agent};
 use crate::cli::McpArgs;
 use crate::exit::Interrupted;
 
 pub async fn run(ctx: &Ctx, args: McpArgs) -> Result<()> {
-    let a = ctx.authed().await?;
+    let a = ctx.authed_with(mcp_user_agent()).await?;
     let host = Local {
         client: Arc::new(a.client),
         root: std::env::current_dir()?,
@@ -83,7 +83,7 @@ impl Host for Local {
     }
 
     fn user_agent(&self) -> String {
-        user_agent()
+        mcp_user_agent()
     }
 
     fn ca_bundle(&self) -> Option<PathBuf> {
