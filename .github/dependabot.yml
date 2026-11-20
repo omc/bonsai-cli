@@ -1,27 +1,25 @@
+# Every ecosystem joins one multi-ecosystem group, so each daily run opens a single
+# pull request with every update, major versions included. See
+# https://docs.github.com/en/code-security/how-tos/secure-your-supply-chain/secure-your-dependencies/configuring-multi-ecosystem-updates
+
 version: 2
+
+multi-ecosystem-groups:
+  dependencies:
+    schedule:
+      interval: daily
 
 updates:
   - package-ecosystem: cargo
     directory: "/"
-    schedule:
-      interval: weekly
+    patterns: ["*"]
+    multi-ecosystem-group: "dependencies"
     cooldown:
       default-days: 7
-    groups:
-      cargo-minor-and-patch:
-        patterns:
-          - "*"
-        update-types:
-          - minor
-          - patch
 
   - package-ecosystem: github-actions
     directory: "/"
-    schedule:
-      interval: weekly
+    patterns: ["*"]
+    multi-ecosystem-group: "dependencies"
     cooldown:
       default-days: 7
-    groups:
-      github-actions:
-        patterns:
-          - "*"
