@@ -1,6 +1,6 @@
 //! Random IDs and secrets.
 
-use rand::Rng;
+use rand::RngExt;
 
 const LOWER_ALNUM: &[u8] = b"0123456789abcdefghijklmnopqrstuvwxyz";
 const HEX: &[u8] = b"0123456789abcdef";
